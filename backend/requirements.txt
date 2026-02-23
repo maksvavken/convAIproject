@@ -1,0 +1,12 @@
+# Pipecat core + transports + all STT/TTS providers
+pipecat-ai[openai,azure,deepgram,elevenlabs,silero,webrtc]==0.0.86
+pipecat-ai-flows==0.0.22
+
+# Web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Utilities
+python-dotenv==1.0.0
+loguru~=0.7.3  # Required by pipecat-ai 0.0.86
+python-multipart==0.0.6

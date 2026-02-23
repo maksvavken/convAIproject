@@ -1,0 +1,17 @@
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/fresh_venv/
+backend/test_venv/
+
+# Environment (API keys!)
+backend/.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# TypeScript
+frontend/tsconfig.tsbuildinfo
