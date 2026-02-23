@@ -15,3 +15,8 @@ frontend/dist/
 
 # TypeScript
 frontend/tsconfig.tsbuildinfo
+
+# Chroma
+backend/chroma_db/
+backend/data/
+

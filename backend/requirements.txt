@@ -10,3 +10,7 @@ uvicorn[standard]==0.24.0
 python-dotenv==1.0.0
 loguru~=0.7.3  # Required by pipecat-ai 0.0.86
 python-multipart==0.0.6
+
+# RAG
+chromadb
+pandas
