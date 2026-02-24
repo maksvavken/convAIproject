@@ -6,6 +6,8 @@ Stripped-down version for local development.
 
 import os
 from typing import Any, Dict
+import chromadb
+from chromadb.utils import embedding_functions
 
 from dotenv import load_dotenv
 from conversation_config import CONVERSATION_CONFIG
@@ -19,6 +21,7 @@ from pipecat.frames.frames import (
     Frame,
     FunctionCallResultFrame,
     LLMFullResponseEndFrame,
+    TranscriptionFrame
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -57,6 +60,12 @@ from pipecat_flows import (
 
 # Load environment variables from .env next to this script (not cwd)
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"), override=True)
+
+# embedding function for chroma
+emb_fn = embedding_functions.OpenAIEmbeddingFunction(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    model_name="text-embedding-3-small"
+)
 
 # Store active peer connections
 pcs_map: Dict[str, Any] = {}
@@ -479,6 +488,9 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
         )
     )
 
+    rag_processor = NutritionRAGProcessor(context)
+
+
     # RTVI processor for frontend communication
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]), transport=transport)
 
@@ -492,6 +504,7 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
             stt,
             stt_mute_filter,
             context_aggregator.user(),
+            rag_processor,
             rtvi,
             llm,
             course_state_processor,
@@ -535,6 +548,57 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
 
     runner = PipelineRunner()
     await runner.run(task)
+
+# ============= ChromaDB Utils ==========
+class NutritionRAGProcessor(FrameProcessor):
+    def __init__(self, context: LLMContext):
+        super().__init__()
+        self._context = context
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, TranscriptionFrame):
+            user_text = frame.text
+            logger.info(f"RAG: Querying database for: {user_text}")
+            
+            retrieved_context = query_nutrition_data(user_text)
+            
+            for message in self._context.messages:
+                if message["role"] == "system":
+                    # Check if this is the "Questions" node prompt or the initial one
+                    # If it's the one we want to keep current:
+                    if "CORE OPERATING PROTOCOLS" in message["content"] or "expert nutritionist" in message["content"].lower():
+                        
+                        base_prompt = message["content"].split("### RETRIEVED FOOD DATA")[0].strip()
+                        new_content = f"{base_prompt}\n\n### RETRIEVED FOOD DATA:\n{retrieved_context}"
+                        message["content"] = new_content                    
+                        
+                        # Only print the one that actually contains our operating instructions
+                        if "CORE OPERATING PROTOCOLS" in message["content"]:
+                            print("\n" + "="*50)
+                            print("UPDATED ACTIVE PROTOCOL PROMPT:")
+                            print(new_content)
+                            print("="*50 + "\n")
+            
+        await self.push_frame(frame, direction)
+
+def query_nutrition_data(query_text: str, n_results: int = 10):
+    try:
+        client = chromadb.PersistentClient(path="./chroma_db")
+        collection = client.get_collection(name="nutrition_data", embedding_function=emb_fn)
+        
+        results = collection.query(
+            query_texts=[query_text],
+            n_results=n_results
+        )
+        
+        # Format the documents into a single block of text for the LLM
+        context_block = "\n".join(results['documents'][0])
+        return context_block
+    except Exception as e:
+        logger.error(f"ChromaDB Query Error: {e}")
+        return "No specific food data found."
 
 
 # ============= FastAPI App =============

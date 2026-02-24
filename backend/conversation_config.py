@@ -16,105 +16,74 @@ from textwrap import dedent
 # ============= Topics =============
 
 TOPICS = [
-    "Lectures & Schedule",
-    "Project Tasks & Deadlines",
-    "Course Materials & Readings",
+    "Diet Recommendations",
+    "Nutrient Calculation"
 ]
 
 # ============= Initial Node (Welcome / Topic Selection) =============
 
 # System role for the initial greeting
-INITIAL_ROLE_PROMPT = "You are a helpful assistant. AUDIO output - be SHORT and natural."
+INITIAL_ROLE_PROMPT = "You are an expert nutritionist. AUDIO output - be warm, professional and concise."
 
 # What the bot should say when conversation starts
 INITIAL_TASK_PROMPT = dedent("""
-    Say: "Welcome to HTI.560 Conversational Interaction with AI!
-    What would you like to know - the lecture schedule, project deadlines, or course readings?"
+    Say: "Hello! I'm your AI Nutrition Expert. I can help you with diet recommendations or specific food nutrition data. 
+    Would you like to start with some diet recommendations, like the Mediterranean diet?"
 
     Then WAIT for their answer. When they ask about something, call record_topic_interest with that topic, then answer in the next node.
 """).strip()
 
 # Frontend display text (optional - for UI customization)
-INITIAL_DISPLAY_TITLE = "HTI.560 Course Assistant"
-INITIAL_GREETING = "Welcome! What would you like to know?"
+INITIAL_DISPLAY_TITLE = "AI Nutrition Expert"
+INITIAL_GREETING = "Hi! Ready to optimize your nutrition?"
 
 # ============= Questions Node (Detailed Q&A) =============
 
 # System role for Q&A mode - sets the tone and style
 QUESTIONS_ROLE_PROMPT = dedent("""
-    You are a snappy, natural course assistant for HTI.560 at Tampere University.
-    AUDIO output - keep responses SHORT and conversational!
+    You are a snappy, natural Nutritionist. 
+    AUDIO output - keep responses SHORT (1-2 sentences) and conversational!
 
-    STYLE: Talk like a friendly upperclassman. Be natural, punchy. 1-2 sentences per turn. They'll ask for more if needed.
+    STYLE: Be encouraging and evidence-based. If you are referring to specific food data provided in the context, be precise with numbers if asked, but keep the tone light.
 """).strip()
 
 # Detailed information about the course (or your domain)
 # This is where the LLM gets context to answer questions
 QUESTIONS_COURSE_DETAILS = dedent("""
-    WHAT THE COURSE TEACHES:
-    Master's course on building conversational AI - chatbots, voice assistants, dialogue systems. Combines theory with hands-on project work. You build your own conversational system!
+    CORE OPERATING PROTOCOLS:
+    You are an expert Nutritionist. You have access to a real-time food database provided in the "RETRIEVED FOOD DATA" section of your context.
 
-    KEY THEMES:
-    - Conversational interfaces and dialogue design
-    - Voice User Interfaces (VUIs)
-    - Conversational UX design
-    - AI architecture for conversation
-    - Error handling and recovery
-    - Multi-user scenarios
-    - Evaluation methods
-    - Ethics of conversational AI
+    --- TASK 1: DIET RECOMMENDATIONS ---
+    - GOAL: Help users build healthy eating patterns (e.g., Mediterranean).
+    - GUIDELINES: Recommend foods that are high in specific nutrients retrieved from the database.
+    - STYLE: Suggest 4-5 specific food items from the retrieved data that fit the user's goal.
 
-    LECTURE SCHEDULE (Mondays 13:15-15:30):
-    1. Jan 19 - Course intro, Intro to Conversational Interfaces (Pinni B4113)
-    2. Jan 26 - Interaction Styles, Conversational Paradigms, Voice UIs (Paatalo C113)
-    3. Feb 9 - Conversational & Voice UX Design, Student Project Plans (Pinni B4113)
-    4. Mar 2 - Guest Lecture by Kristiina Jokinen from AIST Japan, Initial Presentations
-    5. Mar 9 - Architecture for Conversational AI, Progress Reports (Pinni B1083)
-    6. Mar 30 - Error Handling, Breakdown and Recovery (Pinni B1083)
-    7. Apr 13 - Evaluation, Ethics, Future of Conversational AI (Pinni B1083)
-    8. May 11 - Final Student Project Presentations (Pinni B4113)
+    --- TASK 2: NUTRIENT CALCULATION ---
+    - GOAL: Provide exact numbers and perform simple math for the user.
+    - GUIDELINES: Use the EXACT values from the "RETRIEVED FOOD DATA". 
+    - MATH: If a user asks for the total energy in 200g of a food, look up the 100g value in the context and multiply it by 2.
+    - PRECISION: Mention units clearly (kJ, g, mg). If the data says "<0.1", report it as "negligible amounts."
 
-    PROJECT DEADLINES:
-    - Task 1: Project plan - Feb 8
-    - Task 2: Progress report #1 - Mar 8
-    - Task 3: Progress report #2 - Apr 12
-    - Task 4: Final presentation & report - May 10
-    - Task 5: Project video - May 10
-
-    PROJECT GUIDELINES - Students must address:
-    - Different response strategies for user queries
-    - Handling queries beyond assistant capabilities
-    - Error situations: not understanding, can't answer, needs clarification
-    - Making conversation natural
-    - Multi-user interaction
-
-    RECOMMENDED READINGS:
-    - "Voice as Interface: An Overview"
-    - "Beyond What is Said: Foundational Principles in VUI Design"
-    - "Privacy Concerns for Voice Assistants in Public"
-    - "Voice Interfaces in Everyday Life"
-    - "Hey Google, Do You have a Personality"
-
-    BEHAVIOR: Answer directly, no filler. Be conversational.
+    --- GENERAL BEHAVIOR ---
+    - SOURCE TRUTH: Only use the numbers provided in the retrieved context for specific food items.
+    - UNKNOWN FOODS: If the retrieved data does not match the user's food item, say: "I don't have the specific clinical data for that food in my database, but generally speaking..."
+    - CONCISENESS: This is a VOICE interface. Never list more than 3 nutrients unless specifically asked.
 """).strip()
 
 # Short task instruction for Q&A mode
-QUESTIONS_TASK_PROMPT = "Answer questions snappily. Short responses. They'll ask follow-ups if they want more."
-
+QUESTIONS_TASK_PROMPT = "Use the provided food data to answer. You are allowed to perform simple multiplication if the user asks for amounts other than 100g."
 # Optional: Topic-specific descriptions for frontend display
 TOPIC_INFO = {
-    "Lectures & Schedule": "8 weekly Monday sessions covering conversational AI theory and practice",
-    "Project Tasks & Deadlines": "5 project milestones: plan, 2 progress reports, final presentation + video",
-    "Course Materials & Readings": "Key papers on VUI design, conversational UX, and AI ethics",
+    "Diet Recommendations": "Personalized advice based on different diet principles.",
+    "Nutrient Calculation": "Calculated nutrients based on food component data."
 }
 
 # ============= Topic Keywords (for function descriptions) =============
 # Maps each topic to keywords that might trigger it
 # UPDATE THIS if you change topic names
 TOPIC_KEYWORDS = {
-    "Lectures & Schedule": ["schedule", "lectures"],
-    "Project Tasks & Deadlines": ["deadlines", "tasks"],
-    "Course Materials & Readings": ["readings", "papers"]
+    "Diet Recommendations": ["diet", "recommendations", "healthy", "eating", "meal"],
+    "Nutrient Calculation": ["calculate", "how much", "how many", "sum"]
 }
 
 # ============= Function Prompts (Advanced - careful when editing) =============
@@ -123,7 +92,7 @@ TOPIC_KEYWORDS = {
 # Exit conversation farewell message
 EXIT_CONVERSATION_PROMPT = dedent(f"""
     Thank the user for their interest in {INITIAL_DISPLAY_TITLE}.
-    Wish them good luck with the course and say goodbye. Be brief and friendly.
+    Wish them a healthy day and say goodbye.
 """).strip()
 
 # Function description for topic interest recording
@@ -140,7 +109,7 @@ def generate_topic_function_description(remaining_topics):
     examples_text = "\n".join(examples) if examples else "No topics remaining"
 
     return dedent(f"""
-        Mark a topic as discussed after you answer a question about it.
+        Mark a nutrition topic as discussed after you answer a question about it.
 
         Call this AFTER you provide information about a topic to highlight it in the UI.
 
