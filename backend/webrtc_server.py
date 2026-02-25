@@ -70,9 +70,25 @@ emb_fn = embedding_functions.OpenAIEmbeddingFunction(
 # Store active peer connections
 pcs_map: Dict[str, Any] = {}
 
+class NutritionRAGProcessor(FrameProcessor):
+    def __init__(self, context: LLMContext):
+        super().__init__()
+        self._context = context
+        self.last_retrieved_context = "No nutrition data retrieved yet."
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, TranscriptionFrame):
+            user_text = frame.text
+            logger.info(f"RAG: Querying database for: {user_text}")
+            retrieved_context = query_nutrition_data(user_text)
+            self.last_retrieved_context = retrieved_context
+            logger.info(f"RAG: Retrieved {len(retrieved_context)} chars")
+            
+        await self.push_frame(frame, direction)
 
 # ============= STT/TTS Service Factories =============
-
 
 def create_llm_service():
     """Create LLM service based on LLM_PROVIDER env var. Default: openai."""
@@ -168,6 +184,7 @@ course_data = {
     "responses": {},
     "current_topics": [],
     "current_node": "initial",
+    "rag_processor": None
 }
 
 
@@ -426,15 +443,21 @@ async def process_topic_interest(
         await flow_manager._task.queue_frame(frame)
         logger.info(f"Course: Marked {topic} as discussed, going to Q&A")
 
-    return None, create_questions_node()
+    rag = course_data.get("rag_processor")
+
+    return None, create_questions_node(rag)
 
 
-def create_questions_node() -> NodeConfig:
+def create_questions_node(rag_processor: NutritionRAGProcessor = None) -> NodeConfig:
     """Q&A node where users can ask detailed questions."""
     config = CONVERSATION_CONFIG["questions_node"]
 
-    # Combine role prompt with course details
-    full_prompt = f"{config['role_prompt']}\n\nFULL COURSE DETAILS:\n\n{config['course_details']}"
+    retrieved = ""
+    if rag_processor and rag_processor.last_retrieved_context:
+        retrieved = f"\n\n### RETRIEVED FOOD DATA:\n{rag_processor.last_retrieved_context}"
+
+    full_prompt = f"{config['role_prompt']}\n\nFULL COURSE DETAILS:\n\n{config['course_details']}{retrieved}"
+
 
     return {
         "name": "questions",
@@ -490,6 +513,7 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
 
     rag_processor = NutritionRAGProcessor(context)
 
+    course_data["rag_processor"] = rag_processor
 
     # RTVI processor for frontend communication
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]), transport=transport)
@@ -503,8 +527,8 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
             transport.input(),
             stt,
             stt_mute_filter,
-            context_aggregator.user(),
             rag_processor,
+            context_aggregator.user(),
             rtvi,
             llm,
             course_state_processor,
@@ -550,49 +574,16 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
     await runner.run(task)
 
 # ============= ChromaDB Utils ==========
-class NutritionRAGProcessor(FrameProcessor):
-    def __init__(self, context: LLMContext):
-        super().__init__()
-        self._context = context
-
-    async def process_frame(self, frame: Frame, direction: FrameDirection):
-        await super().process_frame(frame, direction)
-
-        if isinstance(frame, TranscriptionFrame):
-            user_text = frame.text
-            logger.info(f"RAG: Querying database for: {user_text}")
-            
-            retrieved_context = query_nutrition_data(user_text)
-            
-            for message in self._context.messages:
-                if message["role"] == "system":
-                    # Check if this is the "Questions" node prompt or the initial one
-                    # If it's the one we want to keep current:
-                    if "CORE OPERATING PROTOCOLS" in message["content"] or "expert nutritionist" in message["content"].lower():
-                        
-                        base_prompt = message["content"].split("### RETRIEVED FOOD DATA")[0].strip()
-                        new_content = f"{base_prompt}\n\n### RETRIEVED FOOD DATA:\n{retrieved_context}"
-                        message["content"] = new_content                    
-                        
-                        # Only print the one that actually contains our operating instructions
-                        if "CORE OPERATING PROTOCOLS" in message["content"]:
-                            print("\n" + "="*50)
-                            print("UPDATED ACTIVE PROTOCOL PROMPT:")
-                            print(new_content)
-                            print("="*50 + "\n")
-            
-        await self.push_frame(frame, direction)
-
 def query_nutrition_data(query_text: str, n_results: int = 10):
     try:
         client = chromadb.PersistentClient(path="./chroma_db")
         collection = client.get_collection(name="nutrition_data", embedding_function=emb_fn)
+        logger.info("Querying chroma")
         
         results = collection.query(
             query_texts=[query_text],
             n_results=n_results
-        )
-        
+        )        
         # Format the documents into a single block of text for the LLM
         context_block = "\n".join(results['documents'][0])
         return context_block
