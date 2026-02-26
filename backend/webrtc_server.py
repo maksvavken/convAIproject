@@ -393,9 +393,11 @@ def create_exit_function() -> FlowsFunctionSchema:
 
 def create_dynamic_topic_function() -> FlowsFunctionSchema:
     """Generate function with dynamic enum based on remaining topics."""
-    remaining = [
-        t for t in course_data["all_topics"] if t not in course_data["discussed_topics"]
-    ]
+    # REMOVED because we allow the user to ask questions on the same topic
+    # remaining = [t for t in course_data["all_topics"] if t not in course_data["discussed_topics"]]
+
+    # QUICK FIX:
+    remaining = course_data["all_topics"]
 
     if not remaining:
         return None
@@ -448,8 +450,8 @@ async def process_topic_interest(
     """Mark topic as discussed and go to Q&A mode."""
     topic = args["topics"][0]
 
+    course_data["responses"][topic] = {"interested": True}
     if topic not in course_data["discussed_topics"]:
-        course_data["responses"][topic] = {"interested": True}
         course_data["discussed_topics"].append(topic)
 
     course_data["current_topics"] = [topic]
@@ -505,7 +507,10 @@ def create_questions_node(rag_processor: NutritionRAGProcessor = None) -> NodeCo
                 "content": config["task_prompt"],
             }
         ],
-        "functions": [create_go_back_function(), create_exit_function()],
+        "functions": [
+            create_go_back_function(),
+            create_exit_function(),
+            create_dynamic_topic_function()],
         "respond_immediately": True,
     }
 
