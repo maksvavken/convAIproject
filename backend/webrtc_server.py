@@ -5,9 +5,13 @@ Stripped-down version for local development.
 """
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Mapping, Optional
 import chromadb
 from chromadb.utils import embedding_functions
+import re
+from pipecat.utils.text.base_text_filter import BaseTextFilter
+from pipecat.utils.text.base_text_aggregator import BaseTextAggregator
+
 
 from dotenv import load_dotenv
 from conversation_config import CONVERSATION_CONFIG
@@ -67,6 +71,30 @@ emb_fn = embedding_functions.OpenAIEmbeddingFunction(
     model_name="text-embedding-3-small"
 )
 
+class DecimalSafeAggregator(BaseTextAggregator):
+    
+    def __init__(self):
+        self._text = ""
+    
+    @property
+    def text(self) -> str:
+        return self._text
+    
+    async def aggregate(self, text: str) -> Optional[str]:
+        self._text += text
+        # Only split on sentence-ending punctuation NOT between two digits
+        if re.search(r'(?<!\d)[.!?](?!\d)', self._text):
+            result = self._text
+            self._text = ""
+            return result
+        return None
+    
+    async def handle_interruption(self):
+        self._text = ""
+    
+    async def reset(self):
+        self._text = ""
+
 # Store active peer connections
 pcs_map: Dict[str, Any] = {}
 
@@ -81,10 +109,10 @@ class NutritionRAGProcessor(FrameProcessor):
 
         if isinstance(frame, TranscriptionFrame):
             user_text = frame.text
-            logger.info(f"RAG: Querying database for: {user_text}")
+            #logger.info(f"RAG: Querying database for: {user_text}")
             retrieved_context = query_nutrition_data(user_text)
             self.last_retrieved_context = retrieved_context
-            logger.info(f"RAG: Retrieved {len(retrieved_context)} chars")
+            #logger.info(f"RAG: Retrieved {len(retrieved_context)} chars")
             
         await self.push_frame(frame, direction)
 
@@ -165,6 +193,7 @@ def create_tts_service():
         return OpenAITTSService(
             api_key=os.getenv("OPENAI_API_KEY"),
             voice=os.getenv("OPENAI_TTS_VOICE", "alloy"),
+            text_aggregator=DecimalSafeAggregator(),
         )
 
     elif provider == "elevenlabs":
@@ -266,6 +295,9 @@ class ConversationStateProcessor(FrameProcessor):
             direction: Frame direction (upstream/downstream).
         """
         await super().process_frame(frame, direction)
+
+        if isinstance(frame, RTVIServerMessageFrame):
+            logger.info(f"RTVI MESSAGE SENT TO FRONTEND: {frame.data}")
 
         # Send state update after LLM responses and function calls
         if isinstance(frame, (LLMFullResponseEndFrame, FunctionCallResultFrame)):
@@ -578,7 +610,6 @@ def query_nutrition_data(query_text: str, n_results: int = 10):
     try:
         client = chromadb.PersistentClient(path="./chroma_db")
         collection = client.get_collection(name="nutrition_data", embedding_function=emb_fn)
-        logger.info("Querying chroma")
         
         results = collection.query(
             query_texts=[query_text],

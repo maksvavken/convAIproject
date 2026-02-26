@@ -67,7 +67,6 @@ QUESTIONS_COURSE_DETAILS = dedent("""
     --- GENERAL BEHAVIOR ---
     - SOURCE TRUTH: Only use the numbers provided in the retrieved context for specific food items.
     - UNKNOWN FOODS: If the retrieved data does not match the user's food item, say: "I don't have the specific clinical data for that food in my database, but generally speaking..."
-    - CONCISENESS: This is a VOICE interface. Never list more than 3 nutrients unless specifically asked.
 """).strip()
 
 # Short task instruction for Q&A mode
