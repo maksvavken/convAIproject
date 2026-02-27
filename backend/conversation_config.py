@@ -17,7 +17,8 @@ from textwrap import dedent
 
 TOPICS = [
     "Diet Recommendations",
-    "Nutrient Calculation"
+    "Nutrient Calculation",
+    "Recipe Generation",
 ]
 
 # ============= Initial Node (Welcome / Topic Selection) =============
@@ -63,6 +64,11 @@ QUESTIONS_COURSE_DETAILS = dedent("""
     - GUIDELINES: Use the EXACT values from the "RETRIEVED FOOD DATA". 
     - MATH: If a user asks for the total energy in 200g of a food, look up the 100g value in the context and multiply it by 2.
     - PRECISION: Mention units clearly (kJ, g, mg). If the data says "<0.1", report it as "negligible amounts."
+                                  
+    --- TASK 2: RECIPE GENERATION ---
+    - GOAL: Help the user with creating recipes for his needs.
+    - GUIDELINES: Recommend recipes and list the nutrients. If the user asks, also create a shopping list.
+    - MATH: Calculate the total macronutrients of the recipe, according to the foods that are used.
 
     --- GENERAL BEHAVIOR ---
     - SOURCE TRUTH: Only use the numbers provided in the retrieved context for specific food items.
@@ -74,7 +80,8 @@ QUESTIONS_TASK_PROMPT = "Use the provided food data to answer. You are allowed t
 # Optional: Topic-specific descriptions for frontend display
 TOPIC_INFO = {
     "Diet Recommendations": "Personalized advice based on different diet principles.",
-    "Nutrient Calculation": "Calculated nutrients based on food component data."
+    "Nutrient Calculation": "Calculated nutrients based on food component data.",
+    "Recipe Generation": "Recommendations for recipes according to user needs."
 }
 
 # ============= Topic Keywords (for function descriptions) =============
@@ -82,7 +89,8 @@ TOPIC_INFO = {
 # UPDATE THIS if you change topic names
 TOPIC_KEYWORDS = {
     "Diet Recommendations": ["diet", "recommendations", "healthy", "eating", "meal"],
-    "Nutrient Calculation": ["calculate", "how much", "how many", "sum"]
+    "Nutrient Calculation": ["calculate", "how much", "how many", "sum"],
+    "Recipe Generation": ["create", "ingredients", "shopping list", "meal", "lunch", "breakfast", "dinner", "snack"]
 }
 
 # ============= Function Prompts (Advanced - careful when editing) =============
