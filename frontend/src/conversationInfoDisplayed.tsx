@@ -29,7 +29,8 @@ export const CONVERSATION_INFO_DISPLAYED = {
   // This appears in:
   // - Browser tab title
   // - Top header bar of the application
-  pageTitle: "HTI.560 Course Assistant",
+  pageTitle: "NutriChat",
+  pageTitleDescription: "AI Nutrient Advisor",
 
   // ============================================================================
   // VISUALIZER CONFIGURATION
@@ -37,7 +38,7 @@ export const CONVERSATION_INFO_DISPLAYED = {
   // Choose which visualizer to display:
   // - "plasma": Animated plasma orb (default, colorful and dynamic)
   // - "waveform": Custom waveform bars (mic + bot audio)
-  visualizerType: "waveform" as "plasma" | "waveform",
+  visualizerType: "plasma" as "plasma" | "waveform",
 
   // ============================================================================
   // TOPIC INFORMATION

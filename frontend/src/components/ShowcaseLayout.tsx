@@ -277,14 +277,22 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   return (
     <div className="min-h-screen bg-white text-gray-900">
       {/* Header */}
-      <header
-        className="relative border-b border-purple-800 bg-cover bg-center"
-        style={{ backgroundImage: "url('https://moodle.tuni.fi/pluginfile.php/1/theme_maisteriboost/slide1image/0/Opiskelijat72scalepurplemod.jpg')" }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-900/85 to-purple-900/85"></div>
-        <div className="relative z-10 flex items-center justify-between p-4">
-          <h1 className="text-xl font-semibold text-white">{CONVERSATION_INFO_DISPLAYED.pageTitle}</h1>
-          <div className="flex items-center gap-4">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-card/80 backdrop-blur-xl">
+        <div className="flex items-center gap-3 w-full">
+          {/*Leaf Icon */}
+          <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shadow-soft">
+            <Leaf className="w-5 h-5 text-white" />
+          </div>
+          <div className="relative z-10 flex items-center justify-between w-full">
+            {/* Page Title and Title Description */}
+            <div>
+              <h1 className="font-semibold text-black">
+                {CONVERSATION_INFO_DISPLAYED.pageTitle}
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                {CONVERSATION_INFO_DISPLAYED.pageTitleDescription}
+              </p>
+            </div>
             <ClientStatus />
           </div>
         </div>
@@ -296,7 +304,9 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
           {/* Left - Visualizer */}
           <div className="lg:col-span-3 bg-white backdrop-blur-sm rounded-lg p-4 border border-[#4e008e]/20 shadow-lg flex flex-col">
-            <h2 className="text-lg font-bold mb-3 text-[#4e008e] text-center">Visualizer</h2>
+            <h2 className="text-lg font-bold mb-3 text-[#4e008e] text-center">
+              Visualizer
+            </h2>
             <div className="relative aspect-square flex items-center justify-center border-2 border-purple-900 rounded-lg">
               {CONVERSATION_INFO_DISPLAYED.visualizerType === 'plasma' ? (
                 <>
