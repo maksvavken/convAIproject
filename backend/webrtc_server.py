@@ -142,7 +142,7 @@ def create_llm_service():
 
 def create_stt_service():
     """Create STT service based on STT_PROVIDER env var."""
-    provider = os.getenv("STT_PROVIDER", "azure").lower()
+    provider = os.getenv("STT_PROVIDER", "deepgram").lower()
 
     if provider == "azure":
         from pipecat.services.azure.stt import AzureSTTService
@@ -169,7 +169,7 @@ def create_stt_service():
 
 def create_tts_service():
     """Create TTS service based on TTS_PROVIDER env var."""
-    provider = os.getenv("TTS_PROVIDER", "azure").lower()
+    provider = os.getenv("TTS_PROVIDER", "deepgram").lower()
 
     if provider == "azure":
         from pipecat.services.azure.tts import AzureTTSService
