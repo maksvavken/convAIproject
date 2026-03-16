@@ -31,6 +31,7 @@ export const CONVERSATION_INFO_DISPLAYED = {
   // - Top header bar of the application
   pageTitle: "NutriChat",
   pageTitleDescription: "AI Nutrient Advisor",
+  welcomeHeroDescription: "Your personal AI nutrition coach. Ask me about nutritional values, meal tips, or healthy recipes!",
 
   // ============================================================================
   // VISUALIZER CONFIGURATION

@@ -12,6 +12,7 @@ import {
   type TopicInfo,
 } from "../conversationInfoDisplayed";
 import { Leaf } from "lucide-react";
+import { WelcomeHero } from "./WelcomeHero";
 
 interface CourseState {
   all_topics: string[];
@@ -366,6 +367,12 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
         </div>
       </header>
       {/* Main Content */}
+
+      {/* Welcome Hero */}
+      <div>
+        <WelcomeHero />
+      </div>
+
       <div className="max-w-7xl mx-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
           {/* Left - Visualizer */}
