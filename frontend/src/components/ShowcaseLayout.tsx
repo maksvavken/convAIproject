@@ -1,13 +1,17 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { usePipecatClient, usePipecatClientMediaTrack } from '@pipecat-ai/client-react';
+import React, { useEffect, useState, useRef } from "react";
 import {
-  ClientStatus,
-  HighlightOverlay,
-} from '@pipecat-ai/voice-ui-kit';
-import { Plasma } from '@pipecat-ai/voice-ui-kit/webgl';
-import type { PipecatBaseChildProps } from '@pipecat-ai/voice-ui-kit';
-import type { PlasmaRef } from '@pipecat-ai/voice-ui-kit/webgl';
-import { CONVERSATION_INFO_DISPLAYED, type TopicInfo } from '../conversationInfoDisplayed';
+  usePipecatClient,
+  usePipecatClientMediaTrack,
+} from "@pipecat-ai/client-react";
+import { ClientStatus, HighlightOverlay } from "@pipecat-ai/voice-ui-kit";
+import { Plasma } from "@pipecat-ai/voice-ui-kit/webgl";
+import type { PipecatBaseChildProps } from "@pipecat-ai/voice-ui-kit";
+import type { PlasmaRef } from "@pipecat-ai/voice-ui-kit/webgl";
+import {
+  CONVERSATION_INFO_DISPLAYED,
+  type TopicInfo,
+} from "../conversationInfoDisplayed";
+import { Leaf } from "lucide-react";
 
 interface CourseState {
   all_topics: string[];
@@ -20,18 +24,20 @@ interface CourseState {
 }
 
 interface TranscriptMessage {
-  speaker: 'user' | 'bot';
+  speaker: "user" | "bot";
   text: string;
   timestamp: number;
 }
 
 const getTopicInfo = (topic: string): TopicInfo => {
-  return CONVERSATION_INFO_DISPLAYED.topics[topic] || {
-    description: "Course information",
-    details: [],
-    link: "",
-    image: ""
-  };
+  return (
+    CONVERSATION_INFO_DISPLAYED.topics[topic] || {
+      description: "Course information",
+      details: [],
+      link: "",
+      image: "",
+    }
+  );
 };
 
 interface ShowcaseLayoutProps extends Partial<PipecatBaseChildProps> {
@@ -46,24 +52,54 @@ interface ShowcaseLayoutProps extends Partial<PipecatBaseChildProps> {
 // Plasma visualizer configs (defined outside component to avoid recreating on each render)
 const subtleConfig = {
   backgroundColor: "#1f2937",
-  ringBounce: 0.15, ringAmplitude: 0.08, ringThicknessAudio: 4,
-  audioSensitivity: 0.3, plasmaVolumeReactivity: 0.4, effectScale: 0.45,
-  ringDistance: 0, ringVariance: 0.2, ringVisibility: 0.6, ringSegments: 5,
-  ringThickness: 3, ringSpread: 0.06, colorCycleSpeed: 0.15,
-  intensity: 0.7, radius: 1.0, glowFalloff: 1, glowThreshold: 0,
-  plasmaSpeed: 0.12, rayLength: 0.6,
-  color1: "#6b7280", color2: "#4b5563", color3: "#374151"
+  ringBounce: 0.15,
+  ringAmplitude: 0.08,
+  ringThicknessAudio: 4,
+  audioSensitivity: 0.3,
+  plasmaVolumeReactivity: 0.4,
+  effectScale: 0.45,
+  ringDistance: 0,
+  ringVariance: 0.2,
+  ringVisibility: 0.6,
+  ringSegments: 5,
+  ringThickness: 3,
+  ringSpread: 0.06,
+  colorCycleSpeed: 0.15,
+  intensity: 0.7,
+  radius: 1.0,
+  glowFalloff: 1,
+  glowThreshold: 0,
+  plasmaSpeed: 0.12,
+  rayLength: 0.6,
+  color1: "#6b7280",
+  color2: "#4b5563",
+  color3: "#374151",
 };
 
 const activeConfig = {
   backgroundColor: "#1f2937",
-  ringBounce: 0.4, ringAmplitude: 0.15, ringThicknessAudio: 15,
-  audioSensitivity: 1.8, plasmaVolumeReactivity: 1.8, effectScale: 0.55,
-  ringDistance: 0, ringVariance: 0.35, ringVisibility: 0.32, ringSegments: 6,
-  ringThickness: 4, ringSpread: 0.1, colorCycleSpeed: 0.25,
-  intensity: 1.3, radius: 1.0, glowFalloff: 1.5, glowThreshold: 0,
-  plasmaSpeed: 0.22, rayLength: 1.0,
-  color1: "#22d3ee", color2: "#34d399", color3: "#818cf8"
+  ringBounce: 0.4,
+  ringAmplitude: 0.15,
+  ringThicknessAudio: 15,
+  audioSensitivity: 1.8,
+  plasmaVolumeReactivity: 1.8,
+  effectScale: 0.55,
+  ringDistance: 0,
+  ringVariance: 0.35,
+  ringVisibility: 0.32,
+  ringSegments: 6,
+  ringThickness: 4,
+  ringSpread: 0.1,
+  colorCycleSpeed: 0.25,
+  intensity: 1.3,
+  radius: 1.0,
+  glowFalloff: 1.5,
+  glowThreshold: 0,
+  plasmaSpeed: 0.22,
+  rayLength: 1.0,
+  color1: "#22d3ee",
+  color2: "#34d399",
+  color3: "#818cf8",
 };
 
 const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
@@ -74,35 +110,39 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
     responses: {},
     remaining_topics: [],
     current_topics: [],
-    current_node: 'initial',
-    progress: '0/3'
+    current_node: "initial",
+    progress: "0/3",
   },
-  transcripts = { user: '', bot: '' },
+  transcripts = { user: "", bot: "" },
   isBotSpeaking = false,
   isUserSpeaking = false,
 }) => {
-  const [transcriptHistory, setTranscriptHistory] = useState<TranscriptMessage[]>([]);
+  const [transcriptHistory, setTranscriptHistory] = useState<
+    TranscriptMessage[]
+  >([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Conversation state machine for plasma colors
-  const [conversationState, setConversationState] = useState<'idle' | 'listening' | 'thinking'>('idle');
+  const [conversationState, setConversationState] = useState<
+    "idle" | "listening" | "thinking"
+  >("idle");
   const prevIsUserSpeaking = useRef(false);
 
   useEffect(() => {
     if (!prevIsUserSpeaking.current && isUserSpeaking) {
-      setConversationState('listening');
+      setConversationState("listening");
     } else if (prevIsUserSpeaking.current && !isUserSpeaking) {
-      setConversationState('thinking');
+      setConversationState("thinking");
     }
     prevIsUserSpeaking.current = isUserSpeaking;
   }, [isUserSpeaking]);
 
   // Clear thinking when bot responds
   useEffect(() => {
-    if (conversationState === 'thinking' && transcriptHistory.length > 0) {
+    if (conversationState === "thinking" && transcriptHistory.length > 0) {
       const last = transcriptHistory[transcriptHistory.length - 1];
-      if (last?.speaker === 'bot') {
-        setConversationState('idle');
+      if (last?.speaker === "bot") {
+        setConversationState("idle");
       }
     }
   }, [transcriptHistory, conversationState]);
@@ -110,10 +150,15 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   // Add final user transcripts to history
   useEffect(() => {
     if (transcripts.user && transcripts.user.trim() && !isUserSpeaking) {
-      setTranscriptHistory(prev => {
-        const lastUserMsg = [...prev].reverse().find(m => m.speaker === 'user');
+      setTranscriptHistory((prev) => {
+        const lastUserMsg = [...prev]
+          .reverse()
+          .find((m) => m.speaker === "user");
         if (!lastUserMsg || lastUserMsg.text !== transcripts.user) {
-          return [...prev, { speaker: 'user', text: transcripts.user, timestamp: Date.now() }];
+          return [
+            ...prev,
+            { speaker: "user", text: transcripts.user, timestamp: Date.now() },
+          ];
         }
         return prev;
       });
@@ -121,14 +166,21 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   }, [transcripts.user, isUserSpeaking]);
 
   // Add bot transcripts to history
-  const lastProcessedTts = useRef('');
+  const lastProcessedTts = useRef("");
   useEffect(() => {
-    if (transcripts.bot && transcripts.bot.trim() && transcripts.bot !== lastProcessedTts.current) {
+    if (
+      transcripts.bot &&
+      transcripts.bot.trim() &&
+      transcripts.bot !== lastProcessedTts.current
+    ) {
       lastProcessedTts.current = transcripts.bot;
-      setTranscriptHistory(prev => {
-        const lastBotMsg = [...prev].reverse().find(m => m.speaker === 'bot');
+      setTranscriptHistory((prev) => {
+        const lastBotMsg = [...prev].reverse().find((m) => m.speaker === "bot");
         if (lastBotMsg && lastBotMsg.text === transcripts.bot) return prev;
-        return [...prev, { speaker: 'bot', text: transcripts.bot, timestamp: Date.now() }];
+        return [
+          ...prev,
+          { speaker: "bot", text: transcripts.bot, timestamp: Date.now() },
+        ];
       });
     }
   }, [transcripts.bot]);
@@ -136,12 +188,12 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   // Auto-scroll conversation
   useEffect(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [transcriptHistory]);
 
   const client = usePipecatClient();
-  const transportState = client?.state ?? 'disconnected';
+  const transportState = client?.state ?? "disconnected";
   const botAudioTrack = usePipecatClientMediaTrack("audio", "bot");
   const plasmaRef = useRef<PlasmaRef>(null);
 
@@ -151,7 +203,11 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
   // Audio analysis for bot audio
   useEffect(() => {
-    if (!botAudioTrack || CONVERSATION_INFO_DISPLAYED.visualizerType !== 'waveform') return;
+    if (
+      !botAudioTrack ||
+      CONVERSATION_INFO_DISPLAYED.visualizerType !== "waveform"
+    )
+      return;
 
     const audioContext = new AudioContext();
     const analyser = audioContext.createAnalyser();
@@ -195,13 +251,17 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
   // Audio analysis for mic (user audio)
   useEffect(() => {
-    if (transportState !== 'ready' || CONVERSATION_INFO_DISPLAYED.visualizerType !== 'waveform') return;
+    if (
+      transportState !== "ready" ||
+      CONVERSATION_INFO_DISPLAYED.visualizerType !== "waveform"
+    )
+      return;
 
     let audioContext: AudioContext;
     let analyser: AnalyserNode;
     let animationId: number;
 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
       audioContext = new AudioContext();
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 256;
@@ -243,24 +303,32 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   // Switch plasma config on connect/disconnect
   useEffect(() => {
     if (plasmaRef.current) {
-      plasmaRef.current.updateConfig(transportState === 'ready' ? activeConfig : subtleConfig);
+      plasmaRef.current.updateConfig(
+        transportState === "ready" ? activeConfig : subtleConfig,
+      );
     }
   }, [transportState]);
 
   // Update plasma colors based on conversation state
   useEffect(() => {
-    if (plasmaRef.current && transportState === 'ready') {
-      if (conversationState === 'listening') {
+    if (plasmaRef.current && transportState === "ready") {
+      if (conversationState === "listening") {
         plasmaRef.current.updateConfig({
-          color1: "#9333ea", color2: "#7c3aed", color3: "#a855f7",
+          color1: "#9333ea",
+          color2: "#7c3aed",
+          color3: "#a855f7",
         });
-      } else if (conversationState === 'thinking') {
+      } else if (conversationState === "thinking") {
         plasmaRef.current.updateConfig({
-          color1: "#22c55e", color2: "#16a34a", color3: "#4ade80",
+          color1: "#22c55e",
+          color2: "#16a34a",
+          color3: "#4ade80",
         });
       } else {
         plasmaRef.current.updateConfig({
-          color1: "#22d3ee", color2: "#34d399", color3: "#818cf8",
+          color1: "#22d3ee",
+          color2: "#34d399",
+          color3: "#818cf8",
         });
       }
     }
@@ -268,9 +336,9 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
   // Reset history on new connection
   useEffect(() => {
-    if (transportState === 'ready') {
+    if (transportState === "ready") {
       setTranscriptHistory([]);
-      lastProcessedTts.current = '';
+      lastProcessedTts.current = "";
     }
   }, [transportState]);
 
@@ -297,33 +365,38 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
           </div>
         </div>
       </header>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
-
           {/* Left - Visualizer */}
           <div className="lg:col-span-3 bg-white backdrop-blur-sm rounded-lg p-4 border border-[#4e008e]/20 shadow-lg flex flex-col">
             <h2 className="text-lg font-bold mb-3 text-[#4e008e] text-center">
               Visualizer
             </h2>
             <div className="relative aspect-square flex items-center justify-center border-2 border-purple-900 rounded-lg">
-              {CONVERSATION_INFO_DISPLAYED.visualizerType === 'plasma' ? (
+              {CONVERSATION_INFO_DISPLAYED.visualizerType === "plasma" ? (
                 <>
                   <Plasma
                     ref={plasmaRef}
-                    audioTrack={transportState === 'ready' ? botAudioTrack : undefined}
+                    audioTrack={
+                      transportState === "ready" ? botAudioTrack : undefined
+                    }
                     alpha={true}
-                    initialConfig={transportState === 'ready' ? activeConfig : subtleConfig}
+                    initialConfig={
+                      transportState === "ready" ? activeConfig : subtleConfig
+                    }
                     className="absolute inset-0 pointer-events-none animate-fade-in z-0"
                   />
-                  {transportState === 'ready' && (
+                  {transportState === "ready" && (
                     <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10">
                       <div className="text-sm font-medium animate-pulse">
-                        {!isBotSpeaking && conversationState === 'listening' && (
-                          <span className="text-purple-400">Listening...</span>
-                        )}
-                        {!isBotSpeaking && conversationState === 'thinking' && (
+                        {!isBotSpeaking &&
+                          conversationState === "listening" && (
+                            <span className="text-purple-400">
+                              Listening...
+                            </span>
+                          )}
+                        {!isBotSpeaking && conversationState === "thinking" && (
                           <span className="text-green-400">Thinking...</span>
                         )}
                       </div>
@@ -339,12 +412,14 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                         className="w-2 bg-purple-500 rounded-t transition-all duration-100"
                         style={{
                           height: `${height}%`,
-                          opacity: transportState === 'ready' ? 1 : 0.3
+                          opacity: transportState === "ready" ? 1 : 0.3,
                         }}
                       />
                     ))}
                   </div>
-                  <div className="text-xs text-center py-2 text-purple-600 font-medium">Your Voice</div>
+                  <div className="text-xs text-center py-2 text-purple-600 font-medium">
+                    Your Voice
+                  </div>
                   <div className="flex-1 flex items-start justify-center gap-1">
                     {botBars.map((height, i) => (
                       <div
@@ -352,12 +427,14 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                         className="w-2 bg-green-500 rounded-b transition-all duration-100"
                         style={{
                           height: `${height}%`,
-                          opacity: transportState === 'ready' ? 1 : 0.3
+                          opacity: transportState === "ready" ? 1 : 0.3,
                         }}
                       />
                     ))}
                   </div>
-                  <div className="text-xs text-center py-2 text-green-600 font-medium">Bot Voice</div>
+                  <div className="text-xs text-center py-2 text-green-600 font-medium">
+                    Bot Voice
+                  </div>
                 </div>
               )}
             </div>
@@ -366,11 +443,13 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
           {/* Middle - Controls + Topics + Current Turn */}
           <div className="lg:col-span-6 space-y-6">
             {/* Connect button - only when disconnected */}
-            {transportState !== 'ready' && (
+            {transportState !== "ready" && (
               <div className="bg-white backdrop-blur-sm rounded-lg p-6 border border-indigo-300 shadow-lg">
                 <div className="mb-4 text-center">
                   <h2 className="text-lg font-bold text-indigo-900">HTI.560</h2>
-                  <p className="text-sm text-gray-700">Conversational Interaction with AI</p>
+                  <p className="text-sm text-gray-700">
+                    Conversational Interaction with AI
+                  </p>
                 </div>
                 <div className="px-3 py-1 mb-4 bg-white border border-black rounded-lg">
                   <p className="text-xs text-black text-center">
@@ -389,68 +468,87 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
             {/* Course Topics */}
             <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-indigo-300 shadow-lg">
               <h2 className="text-lg font-bold mb-1 text-center text-indigo-900">
-                {courseState.current_node === 'questions' ? 'Course Info - Q&A Mode' : 'Ask about Course Topics'}
+                {courseState.current_node === "questions"
+                  ? "Course Info - Q&A Mode"
+                  : "Ask about Course Topics"}
               </h2>
               <p className="text-xs text-gray-600 text-center mb-4">
-                {courseState.current_node === 'questions'
-                  ? 'Ask me anything about the course!'
-                  : 'What would you like to know about?'}
+                {courseState.current_node === "questions"
+                  ? "Ask me anything about the course!"
+                  : "What would you like to know about?"}
               </p>
 
-              <div className={courseState.current_node === 'questions' ? 'w-full' : 'space-y-2'}>
-                {courseState.current_node === 'questions' ? (
-                  courseState.current_topics
-                    .map(topic => {
-                      const topicInfo = getTopicInfo(topic);
-                      return (
-                        <div key={topic} className="w-full p-4 rounded-lg bg-white border-2 border-green-600">
-                          <div className="flex items-center gap-2 mb-3">
-                            <h3 className="font-semibold text-base text-green-700">{topic}</h3>
-                          </div>
-                          <p className="text-sm text-gray-700 mb-3">{topicInfo.description}</p>
-                          {topicInfo.image && (
-                            <img
-                              src={topicInfo.image}
-                              alt={topic}
-                              className="w-full h-auto rounded-lg mb-3 max-h-64 object-cover"
-                            />
-                          )}
-                          <ul className="text-sm text-gray-600 space-y-1 mb-3">
-                            {topicInfo.details.map((detail, idx) => (
-                              <li key={idx}>- {detail}</li>
-                            ))}
-                          </ul>
-                          {topicInfo.link && (
-                            <a
-                              href={topicInfo.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block px-3 py-1 text-sm text-blue-600 hover:text-blue-800 bg-blue-50 rounded-lg border border-blue-200"
-                            >
-                              Open in Moodle
-                            </a>
-                          )}
+              <div
+                className={
+                  courseState.current_node === "questions"
+                    ? "w-full"
+                    : "space-y-2"
+                }
+              >
+                {courseState.current_node === "questions" ? (
+                  courseState.current_topics.map((topic) => {
+                    const topicInfo = getTopicInfo(topic);
+                    return (
+                      <div
+                        key={topic}
+                        className="w-full p-4 rounded-lg bg-white border-2 border-green-600"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <h3 className="font-semibold text-base text-green-700">
+                            {topic}
+                          </h3>
                         </div>
-                      );
-                    })
+                        <p className="text-sm text-gray-700 mb-3">
+                          {topicInfo.description}
+                        </p>
+                        {topicInfo.image && (
+                          <img
+                            src={topicInfo.image}
+                            alt={topic}
+                            className="w-full h-auto rounded-lg mb-3 max-h-64 object-cover"
+                          />
+                        )}
+                        <ul className="text-sm text-gray-600 space-y-1 mb-3">
+                          {topicInfo.details.map((detail, idx) => (
+                            <li key={idx}>- {detail}</li>
+                          ))}
+                        </ul>
+                        {topicInfo.link && (
+                          <a
+                            href={topicInfo.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block px-3 py-1 text-sm text-blue-600 hover:text-blue-800 bg-blue-50 rounded-lg border border-blue-200"
+                          >
+                            Open in Moodle
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="grid grid-cols-3 gap-3">
-                    {courseState.all_topics.map(topic => {
-                      const isDiscussed = courseState.discussed_topics.includes(topic);
-                      const isInterested = courseState.responses[topic]?.interested;
+                    {courseState.all_topics.map((topic) => {
+                      const isDiscussed =
+                        courseState.discussed_topics.includes(topic);
+                      const isInterested =
+                        courseState.responses[topic]?.interested;
 
-                      let bgClass = 'bg-purple-50 border border-purple-300';
-                      let textColor = 'text-gray-800';
-                      let icon = 'o';
+                      let bgClass = "bg-purple-50 border border-purple-300";
+                      let textColor = "text-gray-800";
+                      let icon = "o";
 
                       if (isDiscussed && isInterested) {
-                        bgClass = 'bg-green-50 border border-green-600';
-                        textColor = 'text-green-800';
-                        icon = 'v';
+                        bgClass = "bg-green-50 border border-green-600";
+                        textColor = "text-green-800";
+                        icon = "v";
                       }
 
                       return (
-                        <div key={topic} className={`p-3 rounded-lg transition-all ${bgClass}`}>
+                        <div
+                          key={topic}
+                          className={`p-3 rounded-lg transition-all ${bgClass}`}
+                        >
                           <div className="flex items-center gap-2">
                             <span className="text-lg font-bold">{icon}</span>
                             <p className={`text-sm ${textColor}`}>{topic}</p>
@@ -465,20 +563,34 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
             {/* Current Turn */}
             <div className="bg-white backdrop-blur-sm rounded-lg p-6 border border-[#4e008e]/20 shadow-lg">
-              {transportState === 'ready' ? (
+              {transportState === "ready" ? (
                 <div className="space-y-4">
                   <div>
-                    <div className="text-xs text-gray-600 mb-1">Assistant (latest):</div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      Assistant (latest):
+                    </div>
                     <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
-                      <span className="text-black">{transcripts.bot || <span className="text-gray-400 italic">Waiting for response...</span>}</span>
+                      <span className="text-black">
+                        {transcripts.bot || (
+                          <span className="text-gray-400 italic">
+                            Waiting for response...
+                          </span>
+                        )}
+                      </span>
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-600 mb-1">
-                      User (latest){isUserSpeaking ? ' - Speaking...' : ''}:
+                      User (latest){isUserSpeaking ? " - Speaking..." : ""}:
                     </div>
                     <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
-                      <span className="text-black">{transcripts.user || <span className="text-gray-400 italic">Waiting for input...</span>}</span>
+                      <span className="text-black">
+                        {transcripts.user || (
+                          <span className="text-gray-400 italic">
+                            Waiting for input...
+                          </span>
+                        )}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -491,25 +603,37 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
           {/* Right - Conversation History */}
           <div className="lg:col-span-3">
             <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-[#4e008e]/20 shadow-lg h-full">
-              <h2 className="text-lg font-bold mb-3 text-[#4e008e] text-center">Conversation</h2>
-              {transportState === 'ready' ? (
-                <div className="h-[600px] overflow-y-auto" ref={scrollContainerRef}>
+              <h2 className="text-lg font-bold mb-3 text-[#4e008e] text-center">
+                Conversation
+              </h2>
+              {transportState === "ready" ? (
+                <div
+                  className="h-[600px] overflow-y-auto"
+                  ref={scrollContainerRef}
+                >
                   {transcriptHistory.length === 0 ? (
                     <div className="text-sm text-gray-600">
                       <div className="mb-2 font-semibold">Session Active</div>
-                      <div className="text-xs text-gray-500">Waiting for conversation...</div>
+                      <div className="text-xs text-gray-500">
+                        Waiting for conversation...
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       {[...transcriptHistory].reverse().map((msg, idx) => (
-                        <div key={idx} className={`flex ${msg.speaker === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[90%] p-2 rounded-lg ${
-                            msg.speaker === 'user'
-                              ? 'bg-blue-50 border border-blue-300'
-                              : 'bg-gray-50 border border-gray-300'
-                          }`}>
+                        <div
+                          key={idx}
+                          className={`flex ${msg.speaker === "user" ? "justify-end" : "justify-start"}`}
+                        >
+                          <div
+                            className={`max-w-[90%] p-2 rounded-lg ${
+                              msg.speaker === "user"
+                                ? "bg-blue-50 border border-blue-300"
+                                : "bg-gray-50 border border-gray-300"
+                            }`}
+                          >
                             <div className="text-xs text-gray-600 font-semibold">
-                              {msg.speaker === 'user' ? 'You' : 'Assistant'}
+                              {msg.speaker === "user" ? "You" : "Assistant"}
                             </div>
                             <div className="text-sm text-black">{msg.text}</div>
                           </div>
@@ -526,7 +650,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
         </div>
       </div>
 
-      {transportState === 'ready' && <HighlightOverlay />}
+      {transportState === "ready" && <HighlightOverlay />}
     </div>
   );
 };
