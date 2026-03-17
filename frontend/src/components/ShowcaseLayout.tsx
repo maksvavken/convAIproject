@@ -14,6 +14,7 @@ import {
 import { Leaf } from "lucide-react";
 import { WelcomeHero } from "./WelcomeHero";
 
+
 interface CourseState {
   all_topics: string[];
   discussed_topics: string[];
@@ -368,9 +369,20 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
       </header>
       {/* Main Content */}
 
-      {/* Welcome Hero */}
-      <div>
-        <WelcomeHero />
+      <div className="lg:col-span-6 space-y-6 flex flex-col items-center">
+        {/* Welcome Hero with connect button - only when disconnected */}
+        {transportState !== "ready" && (
+          <div className="flex flex-col items-center gap-4">
+            {/* Logo with Introductory text */}
+            <WelcomeHero />
+            <button
+              onClick={handleConnect}
+              className="flex px-4 py-3 bg-white border border-green-500  hover:bg-neutral-200  text-gray-700 rounded-xl transition-all transform hover:scale-105 font-bold shadow-md"
+            >
+              Start Interaction
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
