@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useReducer } from "react";
 import {
   usePipecatClient,
   usePipecatClientMediaTrack,
@@ -13,7 +13,7 @@ import {
 } from "../conversationInfoDisplayed";
 import { Leaf } from "lucide-react";
 import { WelcomeHero } from "./WelcomeHero";
-
+import { appStateReducer } from "../state/appStateReducer";
 
 interface CourseState {
   all_topics: string[];
@@ -124,30 +124,48 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   >([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Conversation state machine for plasma colors
-  const [conversationState, setConversationState] = useState<
-    "idle" | "listening" | "thinking"
-  >("idle");
+  const client = usePipecatClient();
+  const transportState = client?.state ?? "disconnected";
+  const botAudioTrack = usePipecatClientMediaTrack("audio", "bot");
+  const plasmaRef = useRef<PlasmaRef>(null);
+
+  const [appState, dispatch] = useReducer(appStateReducer, "disconnected");
+
+  const onConnectClick = async () => {
+    dispatch({ type: "CONNECT_REQUEST" });
+    console.log("DISPATCH CONNECT_REQUEST");
+
+    try {
+      await handleConnect?.();
+    } catch (error) {
+      dispatch({ type: "CONNECT_FAILURE" });
+      console.error("Connect failed:", error);
+    }
+  };
+
+  const isConnected = appState !== "disconnected" && appState !== "connecting" && appState !== "error";
+
   const prevIsUserSpeaking = useRef(false);
+  const prevIsBotSpeaking = useRef(false);
 
   useEffect(() => {
     if (!prevIsUserSpeaking.current && isUserSpeaking) {
-      setConversationState("listening");
+      dispatch({ type: "USER_STARTED_SPEAKING" });
     } else if (prevIsUserSpeaking.current && !isUserSpeaking) {
-      setConversationState("thinking");
+      dispatch({ type: "USER_STOPPED_SPEAKING" });
     }
     prevIsUserSpeaking.current = isUserSpeaking;
   }, [isUserSpeaking]);
 
-  // Clear thinking when bot responds
   useEffect(() => {
-    if (conversationState === "thinking" && transcriptHistory.length > 0) {
-      const last = transcriptHistory[transcriptHistory.length - 1];
-      if (last?.speaker === "bot") {
-        setConversationState("idle");
-      }
+    if (!prevIsBotSpeaking.current && isBotSpeaking) {
+      dispatch({ type: "BOT_STARTED_SPEAKING" });
+    } else if (prevIsBotSpeaking.current && !isBotSpeaking) {
+      dispatch({ type: "BOT_FINISHED_SPEAKING" });
     }
-  }, [transcriptHistory, conversationState]);
+
+    prevIsBotSpeaking.current = isBotSpeaking;
+  }, [isBotSpeaking]);
 
   // Add final user transcripts to history
   useEffect(() => {
@@ -194,10 +212,23 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
     }
   }, [transcriptHistory]);
 
-  const client = usePipecatClient();
-  const transportState = client?.state ?? "disconnected";
-  const botAudioTrack = usePipecatClientMediaTrack("audio", "bot");
-  const plasmaRef = useRef<PlasmaRef>(null);
+  useEffect(() => {
+    if (transportState === "connecting") {
+      dispatch({ type: "CONNECT_REQUEST" });
+    } else if (transportState === "ready") {
+      dispatch({ type: "CONNECT_SUCCESS" });
+    } else if (transportState === "disconnected") {
+      dispatch({ type: "DISCONNECT" });
+    }
+  }, [transportState]);
+
+  useEffect(() => {
+    console.log("appState changed →", appState);
+  }, [appState]);
+
+  useEffect(() => {
+    console.log("transportState:", transportState);
+  }, [transportState]);
 
   // Waveform visualization state
   const [micBars, setMicBars] = useState<number[]>(Array(32).fill(5));
@@ -312,7 +343,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   }, [transportState]);
 
   // Update plasma colors based on conversation state
-  useEffect(() => {
+  {/*useEffect(() => {
     if (plasmaRef.current && transportState === "ready") {
       if (conversationState === "listening") {
         plasmaRef.current.updateConfig({
@@ -334,7 +365,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
         });
       }
     }
-  }, [conversationState, transportState]);
+  }, [conversationState, transportState]); */}
 
   // Reset history on new connection
   useEffect(() => {
@@ -371,12 +402,12 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
       <div className="lg:col-span-6 space-y-6 flex flex-col items-center">
         {/* Welcome Hero with connect button - only when disconnected */}
-        {transportState !== "ready" && (
+        {!isConnected && (
           <div className="flex flex-col items-center gap-4">
             {/* Logo with Introductory text */}
             <WelcomeHero />
             <button
-              onClick={handleConnect}
+              onClick={onConnectClick}
               className="flex px-4 py-3 bg-white border border-green-500  hover:bg-neutral-200  text-gray-700 rounded-xl transition-all transform hover:scale-105 font-bold shadow-md"
             >
               Start Interaction
@@ -409,14 +440,14 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                   {transportState === "ready" && (
                     <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10">
                       <div className="text-sm font-medium animate-pulse">
-                        {!isBotSpeaking &&
-                          conversationState === "listening" && (
-                            <span className="text-purple-400">
-                              Listening...
-                            </span>
-                          )}
-                        {!isBotSpeaking && conversationState === "thinking" && (
+                        {appState === "ready_user_listening" && (
+                          <span className="text-purple-400">Listening...</span>
+                        )}
+                        {appState === "ready_bot_thinking" && (
                           <span className="text-green-400">Thinking...</span>
+                        )}
+                        {appState === "ready_bot_speaking" && (
+                          <span className="text-cyan-400">Speaking...</span>
                         )}
                       </div>
                     </div>
@@ -559,7 +590,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
             {/* Current Turn */}
             <div className="bg-white backdrop-blur-sm rounded-lg p-6 border border-[#4e008e]/20 shadow-lg">
-              {transportState === "ready" ? (
+              {isConnected ? (
                 <div className="space-y-4">
                   <div>
                     <div className="text-xs text-gray-600 mb-1">
@@ -602,7 +633,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
               <h2 className="text-lg font-bold mb-3 text-[#4e008e] text-center">
                 Conversation
               </h2>
-              {transportState === "ready" ? (
+              {isConnected ? (
                 <div
                   className="h-[600px] overflow-y-auto"
                   ref={scrollContainerRef}
@@ -646,7 +677,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
         </div>
       </div>
 
-      {transportState === "ready" && <HighlightOverlay />}
+      {isConnected && <HighlightOverlay />}
     </div>
   );
 };
