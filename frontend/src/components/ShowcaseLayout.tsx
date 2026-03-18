@@ -461,29 +461,6 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
           {/* Middle - Controls + Topics + Current Turn */}
           <div className="lg:col-span-6 space-y-6">
-            {/* Connect button - only when disconnected */}
-            {transportState !== "ready" && (
-              <div className="bg-white backdrop-blur-sm rounded-lg p-6 border border-indigo-300 shadow-lg">
-                <div className="mb-4 text-center">
-                  <h2 className="text-lg font-bold text-indigo-900">HTI.560</h2>
-                  <p className="text-sm text-gray-700">
-                    Conversational Interaction with AI
-                  </p>
-                </div>
-                <div className="px-3 py-1 mb-4 bg-white border border-black rounded-lg">
-                  <p className="text-xs text-black text-center">
-                    Have your mic ready and just speak naturally!
-                  </p>
-                </div>
-                <button
-                  onClick={handleConnect}
-                  className="w-full px-4 py-3 bg-gradient-to-r from-indigo-700 to-purple-700 hover:from-indigo-800 hover:to-purple-800 text-white rounded-lg transition-all transform hover:scale-105 font-medium shadow-lg"
-                >
-                  Start voice interaction
-                </button>
-              </div>
-            )}
-
             {/* Course Topics */}
             <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-indigo-300 shadow-lg">
               <h2 className="text-lg font-bold mb-1 text-center text-indigo-900">
