@@ -219,8 +219,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
       {/* Main Content */}
 
-      <div className="lg:col-span-6 space-y-6 flex flex-col items-center">
-        {/* Welcome Hero with connect button - only when disconnected */}
+      {/* Welcome Hero with connect button - only when disconnected */}
         {!isConnected && (
           <div className="flex flex-col items-center gap-4">
             {/* Logo with Introductory text */}
@@ -233,9 +232,9 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
             </button>
           </div>
         )}
-      </div>
 
       <div className="max-w-7xl mx-auto p-6">
+        
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
           
           {/* Left - Visualizer Plasma */}
