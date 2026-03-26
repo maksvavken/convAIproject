@@ -221,7 +221,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
       {/* Welcome Hero with connect button - only when disconnected */}
         {!isConnected ? (
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center justify-center min-h-[80vh] gap-8">
             {/* Logo with Introductory text */}
             <WelcomeHero />
             <button
