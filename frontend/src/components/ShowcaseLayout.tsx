@@ -220,7 +220,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
       {/* Main Content */}
 
       {/* Welcome Hero with connect button - only when disconnected */}
-        {!isConnected && (
+        {!isConnected ? (
           <div className="flex flex-col items-center gap-4">
             {/* Logo with Introductory text */}
             <WelcomeHero />
@@ -231,7 +231,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
               Start Interaction
             </button>
           </div>
-        )}
+        ): (
 
       <div className="max-w-7xl mx-auto p-6">
         
@@ -432,6 +432,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
           </div>
         </div>
       </div>
+        )}
 
       {isConnected && <HighlightOverlay />}
     </div>
