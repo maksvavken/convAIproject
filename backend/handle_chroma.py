@@ -4,7 +4,8 @@ from chromadb.utils import embedding_functions
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load environment variables from .env next to this script (not cwd)
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"), override=True)
 
 emb_fn = embedding_functions.OpenAIEmbeddingFunction(
     api_key=os.getenv("OPENAI_API_KEY"),
