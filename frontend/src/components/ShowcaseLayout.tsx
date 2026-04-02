@@ -13,6 +13,7 @@ import { WelcomeHero } from "./WelcomeHero";
 import { appStateReducer } from "../state/appStateReducer";
 import { Header } from "./layout/Header";
 import { VisualizerPanel } from "./VisualizerPanel";
+import { ChatInput } from "./ChatInput";
 interface CourseState {
   all_topics: string[];
   discussed_topics: string[];
@@ -232,7 +233,10 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
           </button>
         </div>
       ) : (
-        <div className="max-w-7xl mx-auto p-6">
+        <div className="max-w-5xl mx-auto p-6">
+          <div>
+            <ChatInput/>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
             {/* Left - Visualizer Plasma */}
             <div className="lg:col-span-3">
