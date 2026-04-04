@@ -215,7 +215,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   }, [transportState]);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="h-screen bg-white text-gray-900 flex flex-col overflow-hidden">
       <Header />
 
       {/* Main Content */}
@@ -233,10 +233,36 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
           </button>
         </div>
       ) : (
-        <div className="max-w-5xl mx-auto p-6">
-          <div>
-            <ChatInput/>
+        <div className="max-w-5xl mx-auto w-full flex-1 min-h-0 flex flex-col overflow-hidden">
+          {/* Conversation History */}
+          <div className="bg-white rounded-lg p-4 mb-4 border border-[#4e008e]/20 flex-1 min-h-0 flex flex-col">
+            <div className="flex-1 min-h-0 overflow-y-auto" ref={scrollContainerRef}>
+              <div className="flex flex-col justify-end min-h-full space-y-2">
+                {[...transcriptHistory].map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex ${msg.speaker === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[90%] p-2 rounded-lg ${
+                        msg.speaker === "user"
+                          ? "bg-blue-50 border border-blue-300"
+                          : "bg-gray-50 border border-gray-300"
+                      }`}
+                    >
+                      <div className="text-xs text-gray-600 font-semibold">
+                        {msg.speaker === "user" ? "You" : "Assistant"}
+                      </div>
+                      <div className="text-sm text-black">{msg.text}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+          {/* Chat Input */}
+          <div className="shrink-0 sticky bottom-0">
+            <ChatInput />
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
             {/* Left - Visualizer Plasma */}
             <div className="lg:col-span-3">
@@ -385,55 +411,8 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
               </div>
             </div>
 
-            {/* Right - Conversation History */}
-            <div className="lg:col-span-3">
-              <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-[#4e008e]/20 shadow-lg h-full">
-                <h2 className="text-lg font-bold mb-3 text-[#4e008e] text-center">
-                  Conversation
-                </h2>
-                {isConnected ? (
-                  <div
-                    className="h-[600px] overflow-y-auto"
-                    ref={scrollContainerRef}
-                  >
-                    {transcriptHistory.length === 0 ? (
-                      <div className="text-sm text-gray-600">
-                        <div className="mb-2 font-semibold">Session Active</div>
-                        <div className="text-xs text-gray-500">
-                          Waiting for conversation...
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {[...transcriptHistory].reverse().map((msg, idx) => (
-                          <div
-                            key={idx}
-                            className={`flex ${msg.speaker === "user" ? "justify-end" : "justify-start"}`}
-                          >
-                            <div
-                              className={`max-w-[90%] p-2 rounded-lg ${
-                                msg.speaker === "user"
-                                  ? "bg-blue-50 border border-blue-300"
-                                  : "bg-gray-50 border border-gray-300"
-                              }`}
-                            >
-                              <div className="text-xs text-gray-600 font-semibold">
-                                {msg.speaker === "user" ? "You" : "Assistant"}
-                              </div>
-                              <div className="text-sm text-black">
-                                {msg.text}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-gray-400 text-sm">Connect to start</p>
-                )}
-              </div>
-            </div>
+            
+          </div>
           </div>
         </div>
       )}
