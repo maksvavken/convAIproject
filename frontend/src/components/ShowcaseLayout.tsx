@@ -235,7 +235,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
       ) : (
         <div className="max-w-5xl mx-auto w-full flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* Conversation History */}
-          <div className="bg-white rounded-lg p-4 mb-4 border border-[#4e008e]/20 flex-1 min-h-0 flex flex-col">
+          <div className="bg-white rounded-lg p-4 mb-4 flex-1 min-h-0 flex flex-col">
             <div
               className="flex-1 min-h-0 overflow-y-auto"
               ref={scrollContainerRef}
@@ -249,14 +249,17 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                     <div
                       className={`max-w-[90%] p-2 rounded-lg ${
                         msg.speaker === "user"
-                          ? "bg-blue-50 border border-blue-300"
-                          : "bg-gray-50 border border-gray-300"
+                          ? "bg-green-500 shadow"
+                          : "bg-gray-50 shadow"
                       }`}
                     >
-                      <div className="text-xs text-gray-600 font-semibold">
-                        {msg.speaker === "user" ? "You" : "Assistant"}
+                      <div
+                        className={`text-sm text-black ${
+                          msg.speaker === "user" ? "text-white" : "text-black"
+                        }`}
+                      >
+                        {msg.text}
                       </div>
-                      <div className="text-sm text-black">{msg.text}</div>
                     </div>
                   </div>
                 ))}
