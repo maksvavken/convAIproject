@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useReducer } from "react";
+import { User } from "lucide-react";
 import {
   usePipecatClient,
   usePipecatClientMediaTrack,
@@ -241,28 +242,38 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
               ref={scrollContainerRef}
             >
               <div className="flex flex-col justify-end min-h-full space-y-2">
-                {[...transcriptHistory].map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex ${msg.speaker === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[90%] p-2 rounded-lg ${
-                        msg.speaker === "user"
-                          ? "bg-green-500 shadow"
-                          : "bg-gray-50 shadow"
-                      }`}
-                    >
-                      <div
-                        className={`text-sm text-black ${
-                          msg.speaker === "user" ? "text-white" : "text-black"
-                        }`}
-                      >
-                        {msg.text}
+                {transcriptHistory.map((msg, idx) =>
+                  msg.speaker === "user" ? (
+                    <div key={idx} className="flex justify-end">
+                      <div className="flex items-end gap-2">
+                        <div className="max-w-[90%] p-2 rounded-lg bg-green-500 shadow">
+                          <div className="text-sm text-white">{msg.text}</div>
+                        </div>
+                        <div className="w-8 h-8 rounded-full border border-green-300 bg-white flex items-center justify-center">
+                          <User className="w-5 h-5" />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ) : (
+                    <div key={idx} className="flex justify-start">
+                      <div className="flex items-end gap-2">
+                        <div className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center">
+                          <VisualizerPanel
+                            transportState={transportState}
+                            appState={appState}
+                            botAudioTrack={botAudioTrack}
+                            visualizerType={
+                              CONVERSATION_INFO_DISPLAYED.visualizerType
+                            }
+                          />
+                        </div>
+                        <div className="max-w-[90%] p-2 rounded-lg bg-gray-50 shadow">
+                          <div className="text-sm text-black">{msg.text}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ),
+                )}
                 <div ref={bottomRef} />
               </div>
             </div>
