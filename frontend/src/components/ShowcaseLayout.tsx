@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useReducer } from "react";
-import { User } from "lucide-react";
+import { Bot, User } from "lucide-react";
 import {
   usePipecatClient,
   usePipecatClientMediaTrack,
@@ -258,14 +258,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                     <div key={idx} className="flex justify-start">
                       <div className="flex items-end gap-2">
                         <div className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center">
-                          <VisualizerPanel
-                            transportState={transportState}
-                            appState={appState}
-                            botAudioTrack={botAudioTrack}
-                            visualizerType={
-                              CONVERSATION_INFO_DISPLAYED.visualizerType
-                            }
-                          />
+                         <Bot className="w-5 h-5"/>
                         </div>
                         <div className="max-w-[90%] p-2 rounded-lg bg-gray-50 shadow">
                           <div className="text-sm text-black">{msg.text}</div>
