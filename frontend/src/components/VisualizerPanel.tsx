@@ -3,7 +3,7 @@ import { Plasma } from "@pipecat-ai/voice-ui-kit/webgl";
 import type { PlasmaRef } from "@pipecat-ai/voice-ui-kit/webgl";
 
 const subtleConfig = {
-  backgroundColor: "#1f2937",
+  backgroundColor: "#22c55e",
   ringBounce: 0.15,
   ringAmplitude: 0.08,
   ringThicknessAudio: 4,
@@ -29,7 +29,7 @@ const subtleConfig = {
 };
 
 const activeConfig = {
-  backgroundColor: "#1f2937",
+  backgroundColor: "#22c55e",
   ringBounce: 0.4,
   ringAmplitude: 0.15,
   ringThicknessAudio: 15,
@@ -56,14 +56,12 @@ const activeConfig = {
 
 interface VisualizerPanelProps {
     transportState: string;
-    appState: string;
     botAudioTrack?: MediaStreamTrack;
     visualizerType: "plasma" | "waveform";
   }
 
 export function VisualizerPanel({
   transportState,
-  appState,
   botAudioTrack,
   visualizerType,
 }: VisualizerPanelProps) {
@@ -149,7 +147,6 @@ export function VisualizerPanel({
           const rms = Math.sqrt(sum / segmentSize);
           bars.push(Math.max(5, Math.min(95, rms * 400)));
         }
-        // 4 Plasma
         setMicBars(bars);
         animationId = requestAnimationFrame(animate);
       };
@@ -172,37 +169,19 @@ export function VisualizerPanel({
     }
   }, [transportState]);
   return (
-    <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-[#4e008e]/20 shadow-lg flex flex-col">
-      <h2 className="text-lg font-bold mb-3 text-[#4e008e] text-center">
-        Visualizer
-      </h2>
-      <div className="relative aspect-square flex items-center justify-center border-2 border-purple-900 rounded-lg">
+    <div className="bg-white backdrop-blur-sm rounded-lg p-4 flex flex-col">
+      <div className="relative aspect-square flex items-center justify-center rounded-full overflow-hidden">
         {visualizerType === "plasma" ? (
         <>
           <Plasma
             ref={plasmaRef}
             audioTrack={transportState === "ready" ? botAudioTrack : undefined}
-            alpha={true}
+            alpha={false}
             initialConfig={
               transportState === "ready" ? activeConfig : subtleConfig
             }
             className="absolute inset-0 pointer-events-none animate-fade-in z-0"
           />
-          {transportState === "ready" && (
-            <div className="absolute bottom-4 left-0 right-0 flex justify-center z-10">
-              <div className="text-sm font-medium animate-pulse">
-                {appState === "ready_user_listening" && (
-                  <span className="text-purple-400">Listening...</span>
-                )}
-                {appState === "ready_bot_thinking" && (
-                  <span className="text-green-400">Thinking...</span>
-                )}
-                {appState === "ready_bot_speaking" && (
-                  <span className="text-cyan-400">Speaking...</span>
-                )}
-              </div>
-            </div>
-          )}
         </>
         ) : (
         <div className="absolute inset-0 flex flex-col p-4">

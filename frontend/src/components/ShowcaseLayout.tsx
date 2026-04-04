@@ -290,7 +290,6 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
               <div className="lg:col-span-3">
                 <VisualizerPanel
                   transportState={transportState}
-                  appState={appState}
                   botAudioTrack={botAudioTrack}
                   visualizerType={CONVERSATION_INFO_DISPLAYED.visualizerType}
                 />
