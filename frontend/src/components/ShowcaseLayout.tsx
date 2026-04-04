@@ -154,10 +154,10 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   }, [transcripts.bot]);
 
   // Auto-scroll conversation
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcriptHistory]);
 
   useEffect(() => {
@@ -236,7 +236,10 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
         <div className="max-w-5xl mx-auto w-full flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* Conversation History */}
           <div className="bg-white rounded-lg p-4 mb-4 border border-[#4e008e]/20 flex-1 min-h-0 flex flex-col">
-            <div className="flex-1 min-h-0 overflow-y-auto" ref={scrollContainerRef}>
+            <div
+              className="flex-1 min-h-0 overflow-y-auto"
+              ref={scrollContainerRef}
+            >
               <div className="flex flex-col justify-end min-h-full space-y-2">
                 {[...transcriptHistory].map((msg, idx) => (
                   <div
@@ -257,162 +260,165 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                     </div>
                   </div>
                 ))}
+                <div ref={bottomRef} />
               </div>
             </div>
           </div>
           {/* Chat Input */}
           <div className="shrink-0 sticky bottom-0">
             <ChatInput />
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
-            {/* Left - Visualizer Plasma */}
-            <div className="lg:col-span-3">
-              <VisualizerPanel
-                transportState={transportState}
-                appState={appState}
-                botAudioTrack={botAudioTrack}
-                visualizerType={CONVERSATION_INFO_DISPLAYED.visualizerType}
-              />
-            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+              {/* Left - Visualizer Plasma */}
+              <div className="lg:col-span-3">
+                <VisualizerPanel
+                  transportState={transportState}
+                  appState={appState}
+                  botAudioTrack={botAudioTrack}
+                  visualizerType={CONVERSATION_INFO_DISPLAYED.visualizerType}
+                />
+              </div>
 
-            {/* Middle - Controls + Topics + Current Turn */}
-            <div className="lg:col-span-6 space-y-6">
-              {/* Course Topics */}
-              <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-indigo-300 shadow-lg">
-                <h2 className="text-lg font-bold mb-1 text-center text-indigo-900">
-                  {courseState.current_node === "questions"
-                    ? "Course Info - Q&A Mode"
-                    : "Ask about Course Topics"}
-                </h2>
-                <p className="text-xs text-gray-600 text-center mb-4">
-                  {courseState.current_node === "questions"
-                    ? "Ask me anything about the course!"
-                    : "What would you like to know about?"}
-                </p>
+              {/* Middle - Controls + Topics + Current Turn */}
+              <div className="lg:col-span-6 space-y-6">
+                {/* Course Topics */}
+                <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-indigo-300 shadow-lg">
+                  <h2 className="text-lg font-bold mb-1 text-center text-indigo-900">
+                    {courseState.current_node === "questions"
+                      ? "Course Info - Q&A Mode"
+                      : "Ask about Course Topics"}
+                  </h2>
+                  <p className="text-xs text-gray-600 text-center mb-4">
+                    {courseState.current_node === "questions"
+                      ? "Ask me anything about the course!"
+                      : "What would you like to know about?"}
+                  </p>
 
-                <div
-                  className={
-                    courseState.current_node === "questions"
-                      ? "w-full"
-                      : "space-y-2"
-                  }
-                >
-                  {courseState.current_node === "questions" ? (
-                    courseState.current_topics.map((topic) => {
-                      const topicInfo = getTopicInfo(topic);
-                      return (
-                        <div
-                          key={topic}
-                          className="w-full p-4 rounded-lg bg-white border-2 border-green-600"
-                        >
-                          <div className="flex items-center gap-2 mb-3">
-                            <h3 className="font-semibold text-base text-green-700">
-                              {topic}
-                            </h3>
-                          </div>
-                          <p className="text-sm text-gray-700 mb-3">
-                            {topicInfo.description}
-                          </p>
-                          {topicInfo.image && (
-                            <img
-                              src={topicInfo.image}
-                              alt={topic}
-                              className="w-full h-auto rounded-lg mb-3 max-h-64 object-cover"
-                            />
-                          )}
-                          <ul className="text-sm text-gray-600 space-y-1 mb-3">
-                            {topicInfo.details.map((detail, idx) => (
-                              <li key={idx}>- {detail}</li>
-                            ))}
-                          </ul>
-                          {topicInfo.link && (
-                            <a
-                              href={topicInfo.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block px-3 py-1 text-sm text-blue-600 hover:text-blue-800 bg-blue-50 rounded-lg border border-blue-200"
-                            >
-                              Open in Moodle
-                            </a>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="grid grid-cols-3 gap-3">
-                      {courseState.all_topics.map((topic) => {
-                        const isDiscussed =
-                          courseState.discussed_topics.includes(topic);
-                        const isInterested =
-                          courseState.responses[topic]?.interested;
-
-                        let bgClass = "bg-purple-50 border border-purple-300";
-                        let textColor = "text-gray-800";
-                        let icon = "o";
-
-                        if (isDiscussed && isInterested) {
-                          bgClass = "bg-green-50 border border-green-600";
-                          textColor = "text-green-800";
-                          icon = "v";
-                        }
-
+                  <div
+                    className={
+                      courseState.current_node === "questions"
+                        ? "w-full"
+                        : "space-y-2"
+                    }
+                  >
+                    {courseState.current_node === "questions" ? (
+                      courseState.current_topics.map((topic) => {
+                        const topicInfo = getTopicInfo(topic);
                         return (
                           <div
                             key={topic}
-                            className={`p-3 rounded-lg transition-all ${bgClass}`}
+                            className="w-full p-4 rounded-lg bg-white border-2 border-green-600"
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg font-bold">{icon}</span>
-                              <p className={`text-sm ${textColor}`}>{topic}</p>
+                            <div className="flex items-center gap-2 mb-3">
+                              <h3 className="font-semibold text-base text-green-700">
+                                {topic}
+                              </h3>
                             </div>
+                            <p className="text-sm text-gray-700 mb-3">
+                              {topicInfo.description}
+                            </p>
+                            {topicInfo.image && (
+                              <img
+                                src={topicInfo.image}
+                                alt={topic}
+                                className="w-full h-auto rounded-lg mb-3 max-h-64 object-cover"
+                              />
+                            )}
+                            <ul className="text-sm text-gray-600 space-y-1 mb-3">
+                              {topicInfo.details.map((detail, idx) => (
+                                <li key={idx}>- {detail}</li>
+                              ))}
+                            </ul>
+                            {topicInfo.link && (
+                              <a
+                                href={topicInfo.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block px-3 py-1 text-sm text-blue-600 hover:text-blue-800 bg-blue-50 rounded-lg border border-blue-200"
+                              >
+                                Open in Moodle
+                              </a>
+                            )}
                           </div>
                         );
-                      })}
+                      })
+                    ) : (
+                      <div className="grid grid-cols-3 gap-3">
+                        {courseState.all_topics.map((topic) => {
+                          const isDiscussed =
+                            courseState.discussed_topics.includes(topic);
+                          const isInterested =
+                            courseState.responses[topic]?.interested;
+
+                          let bgClass = "bg-purple-50 border border-purple-300";
+                          let textColor = "text-gray-800";
+                          let icon = "o";
+
+                          if (isDiscussed && isInterested) {
+                            bgClass = "bg-green-50 border border-green-600";
+                            textColor = "text-green-800";
+                            icon = "v";
+                          }
+
+                          return (
+                            <div
+                              key={topic}
+                              className={`p-3 rounded-lg transition-all ${bgClass}`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg font-bold">
+                                  {icon}
+                                </span>
+                                <p className={`text-sm ${textColor}`}>
+                                  {topic}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Current Turn */}
+                <div className="bg-white backdrop-blur-sm rounded-lg p-6 border border-[#4e008e]/20 shadow-lg">
+                  {isConnected ? (
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-xs text-gray-600 mb-1">
+                          Assistant (latest):
+                        </div>
+                        <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
+                          <span className="text-black">
+                            {transcripts.bot || (
+                              <span className="text-gray-400 italic">
+                                Waiting for response...
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-600 mb-1">
+                          User (latest){isUserSpeaking ? " - Speaking..." : ""}:
+                        </div>
+                        <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
+                          <span className="text-black">
+                            {transcripts.user || (
+                              <span className="text-gray-400 italic">
+                                Waiting for input...
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
                     </div>
+                  ) : (
+                    <p className="text-gray-400">Waiting for connection...</p>
                   )}
                 </div>
               </div>
-
-              {/* Current Turn */}
-              <div className="bg-white backdrop-blur-sm rounded-lg p-6 border border-[#4e008e]/20 shadow-lg">
-                {isConnected ? (
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-xs text-gray-600 mb-1">
-                        Assistant (latest):
-                      </div>
-                      <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
-                        <span className="text-black">
-                          {transcripts.bot || (
-                            <span className="text-gray-400 italic">
-                              Waiting for response...
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-600 mb-1">
-                        User (latest){isUserSpeaking ? " - Speaking..." : ""}:
-                      </div>
-                      <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
-                        <span className="text-black">
-                          {transcripts.user || (
-                            <span className="text-gray-400 italic">
-                              Waiting for input...
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-400">Waiting for connection...</p>
-                )}
-              </div>
             </div>
-
-            
-          </div>
           </div>
         </div>
       )}
