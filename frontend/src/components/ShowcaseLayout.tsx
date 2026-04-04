@@ -3,6 +3,7 @@ import { Bot, User } from "lucide-react";
 import {
   usePipecatClient,
   usePipecatClientMediaTrack,
+  usePipecatClientMicControl,
 } from "@pipecat-ai/client-react";
 import { HighlightOverlay } from "@pipecat-ai/voice-ui-kit";
 import type { PipecatBaseChildProps } from "@pipecat-ai/voice-ui-kit";
@@ -74,8 +75,14 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   const client = usePipecatClient();
   const transportState = client?.state ?? "disconnected";
   const botAudioTrack = usePipecatClientMediaTrack("audio", "bot");
+  const localAudioTrack = usePipecatClientMediaTrack("audio", "local");
+  const { enableMic, isMicEnabled } = usePipecatClientMicControl();
 
   const [appState, dispatch] = useReducer(appStateReducer, "disconnected");
+
+  const handleMicToggle = () => {
+    enableMic(!isMicEnabled);
+  };
 
   const onConnectClick = async () => {
     dispatch({ type: "CONNECT_REQUEST" });
@@ -258,7 +265,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                     <div key={idx} className="flex justify-start">
                       <div className="flex items-end gap-2">
                         <div className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center">
-                         <Bot className="w-5 h-5"/>
+                          <Bot className="w-5 h-5" />
                         </div>
                         <div className="max-w-[90%] p-2 rounded-lg bg-gray-50 shadow">
                           <div className="text-sm text-black">{msg.text}</div>
@@ -273,7 +280,11 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
           </div>
           {/* Chat Input */}
           <div className="shrink-0 sticky bottom-0">
-            <ChatInput />
+            <ChatInput
+              onMicToggle={handleMicToggle}
+              isMicEnabled={isMicEnabled}
+              disabled={!isConnected}
+            />
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
               {/* Left - Visualizer Plasma */}
               <div className="lg:col-span-3">
