@@ -57,6 +57,7 @@ python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env               # Then edit .env with your API keys
+python handle_chroma.py
 python webrtc_server.py
 
 # Frontend (new terminal)
