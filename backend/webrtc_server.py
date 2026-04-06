@@ -170,6 +170,7 @@ def create_stt_service():
 def create_tts_service():
     """Create TTS service based on TTS_PROVIDER env var."""
     provider = os.getenv("TTS_PROVIDER", "deepgram").lower()
+    markdown_filter = MarkdownTextFilter()
 
     if provider == "azure":
         from pipecat.services.azure.tts import AzureTTSService
@@ -186,6 +187,7 @@ def create_tts_service():
         return DeepgramTTSService(
             api_key=os.getenv("DEEPGRAM_API_KEY"),
             voice=os.getenv("DEEPGRAM_TTS_VOICE", "aura-asteria-en"),
+            text_filters=[markdown_filter],
         )
 
     elif provider == "openai":
@@ -193,6 +195,7 @@ def create_tts_service():
         return OpenAITTSService(
             api_key=os.getenv("OPENAI_API_KEY"),
             voice=os.getenv("OPENAI_TTS_VOICE", "alloy"),
+            text_filters=[markdown_filter],
             text_aggregator=DecimalSafeAggregator(),
         )
 
@@ -201,6 +204,7 @@ def create_tts_service():
         return ElevenLabsTTSService(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
             voice_id=os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"),
+            text_filters=[markdown_filter],
         )
 
     else:
