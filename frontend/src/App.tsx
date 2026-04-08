@@ -49,6 +49,9 @@ function App() {
         progress: data.progress || '0/3'
       });
     }
+    if (data?.type === 'structured_data') {
+      console.log('[StructuredData]', JSON.stringify(data.payload, null, 2));
+    }
   }, []);
 
   const handleUserTranscript = useCallback((data: any) => {

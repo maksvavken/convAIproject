@@ -11,7 +11,7 @@ from chromadb.utils import embedding_functions
 import re
 from pipecat.utils.text.base_text_filter import BaseTextFilter
 from pipecat.utils.text.base_text_aggregator import BaseTextAggregator
-
+import json
 
 from dotenv import load_dotenv
 from conversation_config import CONVERSATION_CONFIG
@@ -25,7 +25,9 @@ from pipecat.frames.frames import (
     Frame,
     FunctionCallResultFrame,
     LLMFullResponseEndFrame,
-    TranscriptionFrame
+    TranscriptionFrame,
+    LLMFullResponseStartFrame, 
+    TextFrame
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -70,6 +72,62 @@ emb_fn = embedding_functions.OpenAIEmbeddingFunction(
     api_key=os.getenv("OPENAI_API_KEY"),
     model_name="text-embedding-3-small"
 )
+
+class StructuredDataProcessor(FrameProcessor):
+    """
+    Intercepts LLM text output, extracts any ---JSON--- block,
+    forwards it to the frontend via RTVI, and strips it from the TTS stream.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._buffer = ""
+        self._capturing = False
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, LLMFullResponseStartFrame):
+            self._buffer = ""
+            self._capturing = True
+            await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, LLMFullResponseEndFrame):
+            self._capturing = False
+            logger.info(f"StructuredData RAW BUFFER: {repr(self._buffer)}")  # add this
+
+            # Parse out the JSON block if present
+            if "---JSON---" in self._buffer:
+                spoken_part, _, json_part = self._buffer.partition("---JSON---")
+                json_str = json_part.strip()
+                try:
+                    data = json.loads(json_str)
+                    await self.push_frame(
+                        RTVIServerMessageFrame(data={
+                            "type": "structured_data",
+                            "payload": data
+                        }),
+                        direction
+                    )
+                    logger.info(f"StructuredData: emitted {data.get('type')}")
+                except json.JSONDecodeError as e:
+                    logger.warning(f"StructuredData: JSON parse failed: {e}")
+            self._buffer = ""
+            await self.push_frame(frame, direction)
+            return
+
+        # Accumulate text; also suppress TextFrames that are pure JSON noise
+        if isinstance(frame, TextFrame) and self._capturing:
+            self._buffer += frame.text
+            # If we've hit the separator, stop forwarding downstream (TTS)
+            if "---JSON---" in self._buffer:
+                return   # drop this frame — TTS won't see it
+            # Otherwise pass the clean spoken text through
+            await self.push_frame(frame, direction)
+            return
+
+        await self.push_frame(frame, direction)
 
 class DecimalSafeAggregator(BaseTextAggregator):
     
@@ -300,8 +358,8 @@ class ConversationStateProcessor(FrameProcessor):
         """
         await super().process_frame(frame, direction)
 
-        if isinstance(frame, RTVIServerMessageFrame):
-            logger.info(f"RTVI MESSAGE SENT TO FRONTEND: {frame.data}")
+        #if isinstance(frame, RTVIServerMessageFrame):
+            #logger.info(f"RTVI MESSAGE SENT TO FRONTEND: {frame.data}")
 
         # Send state update after LLM responses and function calls
         if isinstance(frame, (LLMFullResponseEndFrame, FunctionCallResultFrame)):
@@ -561,6 +619,9 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
 
     # Course state processor — sends flow state to frontend
     course_state_processor = ConversationStateProcessor(course_data)
+    # To seperate json from readable text. Used for extracting Nutritional tables and shopping lists
+    structured_data_processor = StructuredDataProcessor()
+
 
     # Pipeline: audio in -> STT -> mute filter -> LLM -> state updates -> TTS -> audio out
     pipeline = Pipeline(
@@ -572,6 +633,7 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
             context_aggregator.user(),
             rtvi,
             llm,
+            structured_data_processor,
             course_state_processor,
             tts,
             transport.output(),
