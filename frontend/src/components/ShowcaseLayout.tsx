@@ -32,6 +32,29 @@ interface TranscriptMessage {
   timestamp: number;
 }
 
+interface ChatSession {
+  id: string;
+  title: string;
+  updatedAt: number;
+  messages: TranscriptMessage[];
+}
+
+const CHAT_HISTORY_STORAGE_KEY = "convai-chat-history-v1";
+
+const createNewChat = (): ChatSession => ({
+  id: `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  title: "New chat",
+  updatedAt: Date.now(),
+  messages: [],
+});
+
+const getChatTitleFromMessages = (messages: TranscriptMessage[]): string => {
+  const firstUserMessage = messages.find((m) => m.speaker === "user")?.text ?? "";
+  const trimmed = firstUserMessage.trim();
+  if (!trimmed) return "New chat";
+  return trimmed.length > 24 ? `${trimmed.slice(0, 24)}...` : trimmed;
+};
+
 const getTopicInfo = (topic: string): TopicInfo => {
   return (
     CONVERSATION_INFO_DISPLAYED.topics[topic] || {
@@ -67,9 +90,43 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   isBotSpeaking = false,
   isUserSpeaking = false,
 }) => {
-  const [transcriptHistory, setTranscriptHistory] = useState<
-    TranscriptMessage[]
-  >([]);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>(() => {
+    try {
+      const raw = window.localStorage.getItem(CHAT_HISTORY_STORAGE_KEY);
+      if (!raw) {
+        return [createNewChat()];
+      }
+      const parsed = JSON.parse(raw) as ChatSession[];
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        return [createNewChat()];
+      }
+      return parsed;
+    } catch {
+      return [createNewChat()];
+    }
+  });
+  const [activeChatId, setActiveChatId] = useState<string>(() => {
+    try {
+      const raw = window.localStorage.getItem(CHAT_HISTORY_STORAGE_KEY);
+      if (!raw) return "";
+      const parsed = JSON.parse(raw) as ChatSession[];
+      if (!Array.isArray(parsed) || parsed.length === 0) return "";
+      return parsed[0].id;
+    } catch {
+      return "";
+    }
+  });
+  const [liveChatId, setLiveChatId] = useState<string>(() => {
+    try {
+      const raw = window.localStorage.getItem(CHAT_HISTORY_STORAGE_KEY);
+      if (!raw) return "";
+      const parsed = JSON.parse(raw) as ChatSession[];
+      if (!Array.isArray(parsed) || parsed.length === 0) return "";
+      return parsed[0].id;
+    } catch {
+      return "";
+    }
+  });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const client = usePipecatClient();
@@ -79,12 +136,143 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   const { enableMic, isMicEnabled } = usePipecatClientMicControl();
 
   const [appState, dispatch] = useReducer(appStateReducer, "disconnected");
+  const [hasStartedInteraction, setHasStartedInteraction] = useState(false);
+  const lastProcessedUser = useRef("");
+  const lastProcessedBot = useRef("");
+  const isSwitchingChatRef = useRef(false);
+  const activeChatIdRef = useRef(activeChatId);
+  const liveChatIdRef = useRef(liveChatId);
+
+  useEffect(() => {
+    activeChatIdRef.current = activeChatId;
+  }, [activeChatId]);
+
+  useEffect(() => {
+    liveChatIdRef.current = liveChatId;
+  }, [liveChatId]);
+
+  const activeChat = chatSessions.find((chat) => chat.id === activeChatId) ?? chatSessions[0];
+  const transcriptHistory = activeChat?.messages ?? [];
+  const canTalkInActiveChat = !!activeChat && activeChat.id === liveChatId;
+
+  useEffect(() => {
+    if (chatSessions.length === 0) {
+      const fallback = createNewChat();
+      setChatSessions([fallback]);
+      setActiveChatId(fallback.id);
+      setLiveChatId(fallback.id);
+      return;
+    }
+    if (!activeChatId || !chatSessions.some((chat) => chat.id === activeChatId)) {
+      setActiveChatId(chatSessions[0].id);
+    }
+    if (!liveChatId || !chatSessions.some((chat) => chat.id === liveChatId)) {
+      setLiveChatId(chatSessions[0].id);
+    }
+  }, [chatSessions, activeChatId, liveChatId]);
+
+  useEffect(() => {
+    window.localStorage.setItem(CHAT_HISTORY_STORAGE_KEY, JSON.stringify(chatSessions));
+  }, [chatSessions]);
+
+  const createAndSelectNewChat = async () => {
+    const newChat = createNewChat();
+    isSwitchingChatRef.current = true;
+    setChatSessions((prev) => [newChat, ...prev]);
+    setActiveChatId(newChat.id);
+    setLiveChatId(newChat.id);
+
+    // Avoid replaying latest transcript values into the newly created chat.
+    lastProcessedUser.current = transcripts.user;
+    lastProcessedBot.current = transcripts.bot;
+
+    try {
+      setHasStartedInteraction(true);
+      await handleConnect?.();
+    } catch (error) {
+      console.error("Failed to start a fresh chat session:", error);
+    }
+
+    isSwitchingChatRef.current = false;
+  };
+
+  const switchToChat = async (chatId: string) => {
+    if (chatId === activeChatIdRef.current) return;
+
+    isSwitchingChatRef.current = true;
+    setActiveChatId(chatId);
+
+    // Prevent adding stale transcript props when active chat changes.
+    lastProcessedUser.current = transcripts.user;
+    lastProcessedBot.current = transcripts.bot;
+
+    isSwitchingChatRef.current = false;
+  };
+
+  const deleteOldChat = (chatId: string) => {
+    if (chatId === liveChatId) return;
+
+    setChatSessions((prev) => {
+      const remaining = prev.filter((chat) => chat.id !== chatId);
+      const nextSessions = remaining.length > 0 ? remaining : [createNewChat()];
+
+      if (!nextSessions.some((chat) => chat.id === activeChatIdRef.current)) {
+        const liveStillExists = nextSessions.some((chat) => chat.id === liveChatId);
+        setActiveChatId(liveStillExists ? liveChatId : nextSessions[0].id);
+      }
+
+      return nextSessions;
+    });
+  };
+
+  const addMessageToActiveChat = (speaker: "user" | "bot", text: string) => {
+    if (!text.trim() || isSwitchingChatRef.current) return;
+
+    setChatSessions((prev) => {
+      if (prev.length === 0) {
+        const created = createNewChat();
+        const nextMessage: TranscriptMessage = { speaker, text, timestamp: Date.now() };
+        const nextChat: ChatSession = {
+          ...created,
+          messages: [nextMessage],
+          title: getChatTitleFromMessages([nextMessage]),
+          updatedAt: Date.now(),
+        };
+        setActiveChatId(nextChat.id);
+        return [nextChat];
+      }
+
+      const targetId = liveChatIdRef.current || prev[0].id;
+      return prev.map((chat) => {
+        if (chat.id !== targetId) return chat;
+
+        const lastMessage = chat.messages[chat.messages.length - 1];
+        if (lastMessage && lastMessage.speaker === speaker && lastMessage.text === text) {
+          return chat;
+        }
+
+        const nextMessages = [
+          ...chat.messages,
+          { speaker, text, timestamp: Date.now() },
+        ];
+        return {
+          ...chat,
+          messages: nextMessages,
+          updatedAt: Date.now(),
+          title: getChatTitleFromMessages(nextMessages),
+        };
+      });
+    });
+  };
 
   const handleMicToggle = () => {
     enableMic(!isMicEnabled);
   };
 
   const onConnectClick = async () => {
+    if (!canTalkInActiveChat) return;
+
+    setHasStartedInteraction(true);
     dispatch({ type: "CONNECT_REQUEST" });
     console.log("DISPATCH CONNECT_REQUEST");
 
@@ -125,39 +313,26 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
   // Add final user transcripts to history
   useEffect(() => {
-    if (transcripts.user && transcripts.user.trim() && !isUserSpeaking) {
-      setTranscriptHistory((prev) => {
-        const lastUserMsg = [...prev]
-          .reverse()
-          .find((m) => m.speaker === "user");
-        if (!lastUserMsg || lastUserMsg.text !== transcripts.user) {
-          return [
-            ...prev,
-            { speaker: "user", text: transcripts.user, timestamp: Date.now() },
-          ];
-        }
-        return prev;
-      });
+    if (
+      transcripts.user &&
+      transcripts.user.trim() &&
+      !isUserSpeaking &&
+      transcripts.user !== lastProcessedUser.current
+    ) {
+      lastProcessedUser.current = transcripts.user;
+      addMessageToActiveChat("user", transcripts.user);
     }
   }, [transcripts.user, isUserSpeaking]);
 
   // Add bot transcripts to history
-  const lastProcessedTts = useRef("");
   useEffect(() => {
     if (
       transcripts.bot &&
       transcripts.bot.trim() &&
-      transcripts.bot !== lastProcessedTts.current
+      transcripts.bot !== lastProcessedBot.current
     ) {
-      lastProcessedTts.current = transcripts.bot;
-      setTranscriptHistory((prev) => {
-        const lastBotMsg = [...prev].reverse().find((m) => m.speaker === "bot");
-        if (lastBotMsg && lastBotMsg.text === transcripts.bot) return prev;
-        return [
-          ...prev,
-          { speaker: "bot", text: transcripts.bot, timestamp: Date.now() },
-        ];
-      });
+      lastProcessedBot.current = transcripts.bot;
+      addMessageToActiveChat("bot", transcripts.bot);
     }
   }, [transcripts.bot]);
 
@@ -172,6 +347,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
     if (transportState === "connecting") {
       dispatch({ type: "CONNECT_REQUEST" });
     } else if (transportState === "ready") {
+      setHasStartedInteraction(true);
       dispatch({ type: "CONNECT_SUCCESS" });
     } else if (transportState === "disconnected") {
       dispatch({ type: "DISCONNECT" });
@@ -214,14 +390,6 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   }, [conversationState, transportState]); */
   }
 
-  // Reset history on new connection
-  useEffect(() => {
-    if (transportState === "ready") {
-      setTranscriptHistory([]);
-      lastProcessedTts.current = "";
-    }
-  }, [transportState]);
-
   return (
     <div className="h-screen bg-white text-gray-900 flex flex-col overflow-hidden">
       <Header />
@@ -229,7 +397,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
       {/* Main Content */}
 
       {/* Welcome Hero with connect button - only when disconnected */}
-      {!isConnected ? (
+      {!isConnected && !hasStartedInteraction ? (
         <div className="flex flex-col items-center justify-center min-h-[80vh] gap-8">
           {/* Logo with Introductory text */}
           <WelcomeHero />
@@ -241,11 +409,67 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
           </button>
         </div>
       ) : (
-        <div className="max-w-5xl mx-auto w-full flex-1 min-h-0 flex flex-col overflow-hidden">
-          {/* Middle - Controls + Topics + Current Turn */}
-          <div className="lg:col-span-6 space-y-6 max-h-[300px]">
-            {/* Course Topics */}
-            <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-indigo-300 shadow-lg">
+        <div className="max-w-6xl mx-auto w-full flex-1 min-h-0 flex gap-4 overflow-hidden px-4">
+          <aside className="w-64 shrink-0 border border-gray-200 rounded-lg p-3 bg-gray-50 hidden md:flex md:flex-col min-h-0">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-gray-700">Chats</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  void createAndSelectNewChat();
+                }}
+                className="text-xs px-2 py-1 rounded-md border border-gray-300 hover:bg-white"
+              >
+                New
+              </button>
+            </div>
+            <div className="overflow-y-auto space-y-2 min-h-0">
+              {chatSessions
+                .slice()
+                .sort((a, b) => b.updatedAt - a.updatedAt)
+                .map((chat) => (
+                  <div
+                    key={chat.id}
+                    className={`w-full p-2 rounded-md border text-sm transition-colors ${
+                      chat.id === activeChatId
+                        ? "border-green-500 bg-white"
+                        : "border-transparent hover:border-gray-300 hover:bg-white"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void switchToChat(chat.id);
+                      }}
+                      className="w-full text-left"
+                    >
+                      <div className="font-medium text-gray-800 truncate">{chat.title}</div>
+                      <div className="text-xs text-gray-500">{chat.messages.length} messages</div>
+                    </button>
+                    {chat.id !== liveChatId && (
+                      <div className="mt-1 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            deleteOldChat(chat.id);
+                          }}
+                          className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </aside>
+
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            {/* Middle - Controls + Topics + Current Turn */}
+            <div className="lg:col-span-6 space-y-6 max-h-[300px]">
+              {/* Course Topics */}
+              <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-indigo-300 shadow-lg">
               <h2 className="text-lg font-bold mb-1 text-center text-indigo-900">
                 {courseState.current_node === "questions"
                   ? "Q&A Mode"
@@ -338,96 +562,115 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                   </div>
                 )}
               </div>
+              </div>
             </div>
-          </div>
-          {/* Conversation History */}
-          <div className="bg-white rounded-lg p-4 mb-4 flex-1 min-h-0 flex flex-col">
-            <div
-              className="flex-1 min-h-0 overflow-y-auto"
-              ref={scrollContainerRef}
-            >
-              <div className="flex flex-col justify-end min-h-full space-y-2">
-                {transcriptHistory.map((msg, idx) =>
-                  msg.speaker === "user" ? (
-                    <div key={idx} className="flex justify-end">
-                      <div className="flex items-end gap-2">
-                        <div className="max-w-[90%] p-2 rounded-lg bg-green-500 shadow">
-                          <div className="text-sm text-white">{msg.text}</div>
+            {/* Conversation History */}
+            <div className="bg-white rounded-lg p-4 mb-4 flex-1 min-h-0 flex flex-col">
+              <div
+                className="flex-1 min-h-0 overflow-y-auto"
+                ref={scrollContainerRef}
+              >
+                <div className="flex flex-col justify-end min-h-full space-y-2">
+                  {transcriptHistory.map((msg, idx) =>
+                    msg.speaker === "user" ? (
+                      <div key={idx} className="flex justify-end">
+                        <div className="flex items-end gap-2">
+                          <div className="max-w-[90%] p-2 rounded-lg bg-green-500 shadow">
+                            <div className="text-sm text-white">{msg.text}</div>
+                          </div>
+                          <div className="w-8 h-8 rounded-full border border-green-300 bg-white flex items-center justify-center">
+                            <User className="w-5 h-5" />
+                          </div>
                         </div>
-                        <div className="w-8 h-8 rounded-full border border-green-300 bg-white flex items-center justify-center">
-                          <User className="w-5 h-5" />
+                      </div>
+                    ) : (
+                      <div key={idx} className="flex justify-start">
+                        <div className="flex items-end gap-2">
+                          <div className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center">
+                            <Bot className="w-5 h-5" />
+                          </div>
+                          <div className="max-w-[90%] p-2 rounded-lg bg-gray-50 shadow">
+                            <div className="text-sm text-black">{msg.text}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ),
+                  )}
+                  <div ref={bottomRef} />
+                </div>
+              </div>
+            </div>
+            {/* Chat Input */}
+            <div className="shrink-0 sticky bottom-0">
+              <ChatInput
+                onMicToggle={handleMicToggle}
+                isMicEnabled={isMicEnabled}
+                disabled={!isConnected || !canTalkInActiveChat}
+              />
+              {!isConnected && canTalkInActiveChat && (
+                <div className="mb-3 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void onConnectClick();
+                    }}
+                    className="px-3 py-2 text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50"
+                  >
+                    Connect to this chat
+                  </button>
+                </div>
+              )}
+              {!canTalkInActiveChat && (
+                <div className="mb-3 text-center text-xs text-gray-500">
+                  This is history mode. Only the active live chat can keep talking.
+                </div>
+              )}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+                {/* Left - Visualizer Plasma */}
+                <div className="lg:col-span-3">
+                  <VisualizerPanel
+                    transportState={transportState}
+                    botAudioTrack={botAudioTrack}
+                    visualizerType={CONVERSATION_INFO_DISPLAYED.visualizerType}
+                  />
+                </div>
+                {/* Current Turn */}
+                <div className="lg:col-span-9 bg-white backdrop-blur-sm rounded-lg p-6 border border-[#4e008e]/20 shadow-lg">
+                  {isConnected ? (
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-xs text-gray-600 mb-1">
+                          Assistant (latest):
+                        </div>
+                        <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
+                          <span className="text-black">
+                            {transcripts.bot || (
+                              <span className="text-gray-400 italic">
+                                Waiting for response...
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-600 mb-1">
+                          User (latest){isUserSpeaking ? " - Speaking..." : ""}:
+                        </div>
+                        <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
+                          <span className="text-black">
+                            {transcripts.user || (
+                              <span className="text-gray-400 italic">
+                                Waiting for input...
+                              </span>
+                            )}
+                          </span>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div key={idx} className="flex justify-start">
-                      <div className="flex items-end gap-2">
-                        <div className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center">
-                          <Bot className="w-5 h-5" />
-                        </div>
-                        <div className="max-w-[90%] p-2 rounded-lg bg-gray-50 shadow">
-                          <div className="text-sm text-black">{msg.text}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ),
-                )}
-                <div ref={bottomRef} />
-              </div>
-            </div>
-          </div>
-          {/* Chat Input */}
-          <div className="shrink-0 sticky bottom-0">
-            <ChatInput
-              onMicToggle={handleMicToggle}
-              isMicEnabled={isMicEnabled}
-              disabled={!isConnected}
-            />
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
-              {/* Left - Visualizer Plasma */}
-              <div className="lg:col-span-3">
-                <VisualizerPanel
-                  transportState={transportState}
-                  botAudioTrack={botAudioTrack}
-                  visualizerType={CONVERSATION_INFO_DISPLAYED.visualizerType}
-                />
-              </div>
-              {/* Current Turn */}
-              <div className="lg:col-span-9 bg-white backdrop-blur-sm rounded-lg p-6 border border-[#4e008e]/20 shadow-lg">
-                {isConnected ? (
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-xs text-gray-600 mb-1">
-                        Assistant (latest):
-                      </div>
-                      <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
-                        <span className="text-black">
-                          {transcripts.bot || (
-                            <span className="text-gray-400 italic">
-                              Waiting for response...
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-600 mb-1">
-                        User (latest){isUserSpeaking ? " - Speaking..." : ""}:
-                      </div>
-                      <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
-                        <span className="text-black">
-                          {transcripts.user || (
-                            <span className="text-gray-400 italic">
-                              Waiting for input...
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-400">Waiting for connection...</p>
-                )}
+                    <p className="text-gray-400">Waiting for connection...</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
