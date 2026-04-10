@@ -15,6 +15,18 @@ interface CourseState {
   progress: string;
 }
 
+interface StructuredPayload {
+  type?: string;
+  title?: string;
+  name?: string;
+  recipe_name?: string;
+  items?: string[];
+  ingredients?: string[];
+  instructions?: string[];
+  steps?: string[];
+  [key: string]: any;
+}
+
 function App() {
   const [courseState, setCourseState] = useState<CourseState>({
     all_topics: [],
@@ -34,6 +46,7 @@ function App() {
   const [isBotSpeaking, setIsBotSpeaking] = useState(false);
   const [streamingUserText, setStreamingUserText] = useState('');
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
+  const [structuredPayload, setStructuredPayload] = useState<StructuredPayload | null>(null);
   const streamingUserTextRef = useRef('');
 
   const handleServerMessage = useCallback((message: any) => {
@@ -50,6 +63,7 @@ function App() {
       });
     }
     if (data?.type === 'structured_data') {
+      setStructuredPayload(data.payload ?? null);
       console.log('[StructuredData]', JSON.stringify(data.payload, null, 2));
     }
   }, []);
@@ -90,12 +104,14 @@ function App() {
 
   const handleConnected = useCallback(() => {
     setTranscripts({ user: '', bot: '' });
+    setStructuredPayload(null);
     setStreamingUserText('');
     setIsUserSpeaking(false);
     setIsBotSpeaking(false);
   }, []);
 
   const handleDisconnected = useCallback(() => {
+    setStructuredPayload(null);
     setStreamingUserText('');
     setIsUserSpeaking(false);
     setIsBotSpeaking(false);
@@ -172,6 +188,7 @@ function App() {
               handleConnect={handleConnect}
               courseState={courseState}
               transcripts={transcripts}
+              structuredPayload={structuredPayload}
               isBotSpeaking={isBotSpeaking}
               streamingUserText={streamingUserText}
               isUserSpeaking={isUserSpeaking}
