@@ -86,6 +86,15 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
+  const normalizedStructuredType = String(structuredPayload?.type ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, "_");
+  const isShoppingList = normalizedStructuredType === "shopping_list";
+  const isRecipe = normalizedStructuredType === "recipe";
+  const hasNutrientRows = Array.isArray(structuredPayload?.rows) && structuredPayload.rows.length > 0;
+  const isNutrientTable = normalizedStructuredType === "nutrient_table" || normalizedStructuredType === "nutrients_table" || normalizedStructuredType === "nutrient" || hasNutrientRows;
+
   const client = usePipecatClient();
   const transportState = client?.state ?? "disconnected";
   const botAudioTrack = usePipecatClientMediaTrack("audio", "bot");
@@ -283,14 +292,14 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                 <div className="sticky top-24 bg-white rounded-lg p-4 border border-gray-200 shadow">
                   <h4 className="text-sm font-semibold mb-2">Details</h4>
                   {structuredPayload ? (
-                    structuredPayload.type === "shopping_list" ? (
+                    isShoppingList ? (
                       <div>
                         <div className="text-xs text-gray-600 mb-2">Shopping List</div>
                         <ul className="list-disc list-inside text-sm text-gray-800">
                           {Array.isArray(structuredPayload.items) ? (structuredPayload.items.map((it: string, i: number) => (<li key={i}>{it}</li>))) : (<li className="text-gray-500">No items</li>)}
                         </ul>
                       </div>
-                    ) : structuredPayload.type === "recipe" ? (
+                    ) : isRecipe ? (
                       <div>
                         <div className="text-xs text-gray-600 mb-2">Recipe</div>
                         <div className="text-sm text-gray-800 mb-3 font-medium">
@@ -324,11 +333,22 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                           </div>
                         )}
                       </div>
-                    ) : structuredPayload.type === "nutrient_table" ? (
+                    ) : isNutrientTable ? (
                       <div>
                         <div className="text-xs text-gray-600 mb-2">Nutrient Table</div>
                         <div className="text-sm text-gray-800 mb-2 font-medium">{structuredPayload.food}</div>
-                        <div className="overflow-x-auto"><table className="w-full text-sm"><tbody>{Array.isArray(structuredPayload.rows) && structuredPayload.rows.map((r: any, i: number) => (<tr key={i} className="border-t"><td className="py-1 pr-2 text-gray-700">{r.nutrient}</td><td className="py-1 text-right text-gray-900 font-medium">{r.amount} {r.unit}</td></tr>))}</tbody></table></div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <tbody>
+                              {Array.isArray(structuredPayload.rows) && structuredPayload.rows.map((r: any, i: number) => (
+                                <tr key={i} className="border-t">
+                                  <td className="py-1 pr-2 text-gray-700">{r.nutrient ?? r.name ?? "Nutrient"}</td>
+                                  <td className="py-1 text-right text-gray-900 font-medium">{r.amount ?? r.value ?? "-"} {r.unit ?? r.uom ?? ""}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     ) : (
                       <div className="text-sm text-gray-600">Unknown data</div>
