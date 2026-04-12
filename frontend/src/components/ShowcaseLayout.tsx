@@ -16,6 +16,7 @@ import { appStateReducer } from "../state/appStateReducer";
 import { Header } from "./layout/Header";
 import { VisualizerPanel } from "./VisualizerPanel";
 import { ChatInput } from "./ChatInput";
+
 interface CourseState {
   all_topics: string[];
   discussed_topics: string[];
@@ -391,43 +392,6 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                   botAudioTrack={botAudioTrack}
                   visualizerType={CONVERSATION_INFO_DISPLAYED.visualizerType}
                 />
-              </div>
-              {/* Current Turn */}
-              <div className="lg:col-span-9 bg-white backdrop-blur-sm rounded-lg p-6 border border-[#4e008e]/20 shadow-lg">
-                {isConnected ? (
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-xs text-gray-600 mb-1">
-                        Assistant (latest):
-                      </div>
-                      <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
-                        <span className="text-black">
-                          {transcripts.bot || (
-                            <span className="text-gray-400 italic">
-                              Waiting for response...
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-600 mb-1">
-                        User (latest){isUserSpeaking ? " - Speaking..." : ""}:
-                      </div>
-                      <div className="text-sm p-3 rounded-lg min-h-[40px] border-2 bg-white border-gray-300">
-                        <span className="text-black">
-                          {transcripts.user || (
-                            <span className="text-gray-400 italic">
-                              Waiting for input...
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-gray-400">Waiting for connection...</p>
-                )}
               </div>
             </div>
           </div>
