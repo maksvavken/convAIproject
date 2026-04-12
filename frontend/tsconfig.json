@@ -20,6 +20,7 @@
     "strictPropertyInitialization": false,
     "noImplicitThis": false,
     "alwaysStrict": false,
+    "ignoreDeprecations": "6.0",
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": false
   },
