@@ -257,7 +257,6 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   const client = usePipecatClient();
   const transportState = client?.state ?? "disconnected";
   const botAudioTrack = usePipecatClientMediaTrack("audio", "bot");
-  const localAudioTrack = usePipecatClientMediaTrack("audio", "local");
   const { enableMic, isMicEnabled } = usePipecatClientMicControl();
 
   const [appState, dispatch] = useReducer(appStateReducer, "disconnected");
@@ -551,7 +550,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                   msg.speaker === "user" ? (
                     <div key={msg.id} className="flex justify-end">
                       <div className="flex items-end gap-2">
-                        <div className="max-w-[90%] p-2 rounded-lg bg-green-500 shadow">
+                        <div className="max-w-[70%] p-2 rounded-lg bg-green-500 shadow">
                           <div className="text-sm text-white">{msg.text}</div>
                         </div>
                         <div className="w-8 h-8 rounded-full border border-green-300 bg-white flex items-center justify-center">
@@ -565,7 +564,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                         <div className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center">
                           <Bot className="w-5 h-5" />
                         </div>
-                        <div className="max-w-[90%] p-2 rounded-lg bg-gray-50 shadow">
+                        <div className="max-w-[70%] p-2 rounded-lg bg-gray-50 shadow">
                           <div className="text-sm text-black">{msg.text}</div>
                         </div>
                       </div>
