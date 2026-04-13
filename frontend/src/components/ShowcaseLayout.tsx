@@ -548,14 +548,17 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
               <div className="flex flex-col justify-end min-h-full space-y-2">
                 {displayedMessages.map((msg) =>
                   msg.speaker === "user" ? (
-                    <div key={msg.id} className="flex justify-end">
-                      <div className="flex items-end gap-2">
+                    <div
+                      key={msg.id}
+                      className="grid w-full grid-cols-[1fr_auto] items-end gap-2"
+                    >
+                      <div className="flex justify-end">
                         <div className="max-w-[70%] p-2 rounded-lg bg-green-500 shadow">
                           <div className="text-sm text-white">{msg.text}</div>
                         </div>
-                        <div className="w-8 h-8 rounded-full border border-green-300 bg-white flex items-center justify-center">
-                          <User className="w-5 h-5" />
-                        </div>
+                      </div>
+                      <div className="w-8 h-8 rounded-full border border-green-300 bg-white flex items-center justify-center shrink-0">
+                        <User className="w-5 h-5" />
                       </div>
                     </div>
                   ) : (
