@@ -17,6 +17,185 @@ import { Header } from "./layout/Header";
 import { VisualizerPanel } from "./VisualizerPanel";
 import { ChatInput } from "./ChatInput";
 
+type Speaker = "user" | "bot";
+type MessageStatus = "streaming" | "final";
+
+type ChatTranscriptAction =
+  | { type: "USER_TRANSCRIPT_UPDATED"; text: string }
+  | { type: "BOT_TRANSCRIPT_UPDATED"; text: string }
+  | { type: "USER_MESSAGE_FINALIZED" }
+  | { type: "BOT_MESSAGE_FINALIZED" }
+  | { type: "RESET_CHAT" };
+
+interface ChatMessage {
+  id: string;
+  speaker: Speaker;
+  text: string;
+  status: MessageStatus;
+  timestamp: number;
+}
+
+interface ChatTranscriptState {
+  messages: ChatMessage[];
+  liveUserMessage: ChatMessage | null;
+  liveBotMessage: ChatMessage | null;
+}
+
+const initialChatTranscriptState: ChatTranscriptState = {
+  messages: [],
+  liveUserMessage: null,
+  liveBotMessage: null,
+};
+
+const mergeUserText = (existingText: string, newText: string): string => {
+  const existing = existingText.trim();
+  const incoming = newText.trim();
+
+  if (!incoming) return existing;
+  if (!existing) return incoming;
+
+  if (existing === incoming) return existing;
+
+  // New incoming text is an extension of existing text
+  if (incoming.startsWith(existing)) return incoming;
+
+  // Existing text is an extension of incoming text
+  if (existing.endsWith(incoming)) return existing;
+
+  // Texts are different but not extensions - concatenate with space
+  return `${existing} ${incoming}`;
+};
+
+const mergeBotText = (existingText: string, newChunk: string): string => {
+  const existing = existingText.trim();
+  const incoming = newChunk.trim();
+
+  if (!incoming) return existing;
+  if (!existing) return incoming;
+  if (existing === incoming) return existing;
+  if (existing.endsWith(incoming)) return existing;
+
+  return `${existing} ${incoming}`;
+};
+
+const chatTranscriptReducer = (
+  state: ChatTranscriptState,
+  action: ChatTranscriptAction,
+): ChatTranscriptState => {
+  switch (action.type) {
+    case "USER_TRANSCRIPT_UPDATED": {
+      const text = action.text.trim();
+      if (!text) return state;
+
+      if (!state.liveUserMessage) {
+        const now = Date.now();
+
+        return {
+          ...state,
+          liveUserMessage: {
+            id: `user-${now}`,
+            speaker: "user",
+            text,
+            status: "streaming",
+            timestamp: now,
+          },
+        };
+      }
+
+      const mergedText = mergeUserText(state.liveUserMessage.text, text);
+
+      if (mergedText === state.liveUserMessage.text) {
+        return state;
+      }
+
+      return {
+        ...state,
+        liveUserMessage: {
+          ...state.liveUserMessage,
+          text: mergedText,
+        },
+      };
+    }
+
+    case "BOT_TRANSCRIPT_UPDATED": {
+      const text = action.text.trim();
+      if (!text) return state;
+
+      if (!state.liveBotMessage) {
+        const now = Date.now();
+
+        return {
+          ...state,
+          liveBotMessage: {
+            id: `bot-${now}`,
+            speaker: "bot",
+            text,
+            status: "streaming",
+            timestamp: now,
+          },
+        };
+      }
+
+      const mergedText = mergeBotText(state.liveBotMessage.text, text);
+
+      if (mergedText === state.liveBotMessage.text) {
+        return state;
+      }
+
+      return {
+        ...state,
+        liveBotMessage: {
+          ...state.liveBotMessage,
+          text: mergedText,
+        },
+      };
+    }
+
+    case "USER_MESSAGE_FINALIZED": {
+      if (!state.liveUserMessage || !state.liveUserMessage.text.trim()) {
+        return state;
+      }
+
+      return {
+        ...state,
+        messages: [
+          ...state.messages,
+          {
+            ...state.liveUserMessage,
+            status: "final",
+          },
+        ],
+        liveUserMessage: null,
+      };
+    }
+
+    case "BOT_MESSAGE_FINALIZED": {
+      if (!state.liveBotMessage || !state.liveBotMessage.text.trim()) {
+        return state;
+      }
+
+      return {
+        ...state,
+        messages: [
+          ...state.messages,
+          {
+            ...state.liveBotMessage,
+            status: "final",
+          },
+        ],
+        liveBotMessage: null,
+      };
+    }
+
+    case "RESET_CHAT": {
+      return initialChatTranscriptState;
+    }
+
+    default:
+      return state;
+  }
+};
+
 interface CourseState {
   all_topics: string[];
   discussed_topics: string[];
@@ -25,12 +204,6 @@ interface CourseState {
   current_topics: string[];
   current_node: string;
   progress: string;
-}
-
-interface TranscriptMessage {
-  speaker: "user" | "bot";
-  text: string;
-  timestamp: number;
 }
 
 const getTopicInfo = (topic: string): TopicInfo => {
@@ -68,9 +241,17 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   isBotSpeaking = false,
   isUserSpeaking = false,
 }) => {
-  const [transcriptHistory, setTranscriptHistory] = useState<
-    TranscriptMessage[]
-  >([]);
+  const [chatState, chatDispatch] = useReducer(
+    chatTranscriptReducer,
+    initialChatTranscriptState,
+  );
+
+  const displayedMessages = [
+    ...chatState.messages,
+    ...(chatState.liveUserMessage ? [chatState.liveUserMessage] : []),
+    ...(chatState.liveBotMessage ? [chatState.liveBotMessage] : []),
+  ].sort((a, b) => a.timestamp - b.timestamp);
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const client = usePipecatClient();
@@ -105,69 +286,88 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   const prevIsUserSpeaking = useRef(false);
   const prevIsBotSpeaking = useRef(false);
 
+  const botFinalizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  const clearBotFinalizeTimeout = () => {
+    if (botFinalizeTimeoutRef.current) {
+      clearTimeout(botFinalizeTimeoutRef.current);
+      botFinalizeTimeoutRef.current = null;
+    }
+  };
+
+  const userFinalizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  const clearUserFinalizeTimeout = () => {
+    if (userFinalizeTimeoutRef.current) {
+      clearTimeout(userFinalizeTimeoutRef.current);
+      userFinalizeTimeoutRef.current = null;
+    }
+  };
+
   useEffect(() => {
     if (!prevIsUserSpeaking.current && isUserSpeaking) {
       dispatch({ type: "USER_STARTED_SPEAKING" });
+      clearUserFinalizeTimeout();
     } else if (prevIsUserSpeaking.current && !isUserSpeaking) {
       dispatch({ type: "USER_STOPPED_SPEAKING" });
+
+      clearUserFinalizeTimeout();
+      userFinalizeTimeoutRef.current = setTimeout(() => {
+        chatDispatch({ type: "USER_MESSAGE_FINALIZED" });
+        userFinalizeTimeoutRef.current = null;
+      }, 1000);
     }
+
     prevIsUserSpeaking.current = isUserSpeaking;
   }, [isUserSpeaking]);
 
   useEffect(() => {
     if (!prevIsBotSpeaking.current && isBotSpeaking) {
       dispatch({ type: "BOT_STARTED_SPEAKING" });
+      clearBotFinalizeTimeout();
     } else if (prevIsBotSpeaking.current && !isBotSpeaking) {
       dispatch({ type: "BOT_FINISHED_SPEAKING" });
+
+      clearBotFinalizeTimeout();
+      botFinalizeTimeoutRef.current = setTimeout(() => {
+        chatDispatch({ type: "BOT_MESSAGE_FINALIZED" });
+        botFinalizeTimeoutRef.current = null;
+      }, 1000);
     }
 
     prevIsBotSpeaking.current = isBotSpeaking;
   }, [isBotSpeaking]);
-
-  // Add final user transcripts to history
-  useEffect(() => {
-    if (transcripts.user && transcripts.user.trim() && !isUserSpeaking) {
-      setTranscriptHistory((prev) => {
-        const lastUserMsg = [...prev]
-          .reverse()
-          .find((m) => m.speaker === "user");
-        if (!lastUserMsg || lastUserMsg.text !== transcripts.user) {
-          return [
-            ...prev,
-            { speaker: "user", text: transcripts.user, timestamp: Date.now() },
-          ];
-        }
-        return prev;
-      });
-    }
-  }, [transcripts.user, isUserSpeaking]);
-
-  // Add bot transcripts to history
-  const lastProcessedTts = useRef("");
-  useEffect(() => {
-    if (
-      transcripts.bot &&
-      transcripts.bot.trim() &&
-      transcripts.bot !== lastProcessedTts.current
-    ) {
-      lastProcessedTts.current = transcripts.bot;
-      setTranscriptHistory((prev) => {
-        const lastBotMsg = [...prev].reverse().find((m) => m.speaker === "bot");
-        if (lastBotMsg && lastBotMsg.text === transcripts.bot) return prev;
-        return [
-          ...prev,
-          { speaker: "bot", text: transcripts.bot, timestamp: Date.now() },
-        ];
-      });
-    }
-  }, [transcripts.bot]);
 
   // Auto-scroll conversation
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [transcriptHistory]);
+  }, [displayedMessages]);
+
+  useEffect(() => {
+    if (transcripts.user?.trim()) {
+      clearUserFinalizeTimeout();
+
+      chatDispatch({
+        type: "USER_TRANSCRIPT_UPDATED",
+        text: transcripts.user,
+      });
+    }
+  }, [transcripts.user]);
+
+  useEffect(() => {
+    if (transcripts.bot?.trim()) {
+      chatDispatch({
+        type: "BOT_TRANSCRIPT_UPDATED",
+        text: transcripts.bot,
+      });
+    }
+  }, [transcripts.bot]);
 
   useEffect(() => {
     if (transportState === "connecting") {
@@ -218,8 +418,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   // Reset history on new connection
   useEffect(() => {
     if (transportState === "ready") {
-      setTranscriptHistory([]);
-      lastProcessedTts.current = "";
+      chatDispatch({ type: "RESET_CHAT" });
     }
   }, [transportState]);
 
@@ -348,9 +547,9 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
               ref={scrollContainerRef}
             >
               <div className="flex flex-col justify-end min-h-full space-y-2">
-                {transcriptHistory.map((msg, idx) =>
+                {displayedMessages.map((msg) =>
                   msg.speaker === "user" ? (
-                    <div key={idx} className="flex justify-end">
+                    <div key={msg.id} className="flex justify-end">
                       <div className="flex items-end gap-2">
                         <div className="max-w-[90%] p-2 rounded-lg bg-green-500 shadow">
                           <div className="text-sm text-white">{msg.text}</div>
@@ -361,7 +560,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <div key={idx} className="flex justify-start">
+                    <div key={msg.id} className="flex justify-start">
                       <div className="flex items-end gap-2">
                         <div className="w-8 h-8 rounded-full border border-gray-300 bg-white flex items-center justify-center">
                           <Bot className="w-5 h-5" />
