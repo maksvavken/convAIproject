@@ -1,9 +1,12 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import {
-  PipecatAppBase,
-  ThemeProvider,
-} from '@pipecat-ai/voice-ui-kit';
-import ShowcaseLayout from './components/ShowcaseLayout';
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+} from "react";
+import { PipecatAppBase, ThemeProvider } from "@pipecat-ai/voice-ui-kit";
+import ShowcaseLayout from "./components/ShowcaseLayout";
 
 interface CourseState {
   all_topics: string[];
@@ -22,35 +25,37 @@ function App() {
     responses: {},
     remaining_topics: [],
     current_topics: [],
-    current_node: 'initial',
-    progress: '0/3'
+    current_node: "initial",
+    progress: "0/3",
   });
 
-  const [transcripts, setTranscripts] = useState<{user: string, bot: string}>({
-    user: '',
-    bot: ''
-  });
+  const [transcripts, setTranscripts] = useState<{ user: string; bot: string }>(
+    {
+      user: "",
+      bot: "",
+    },
+  );
 
   const [isBotSpeaking, setIsBotSpeaking] = useState(false);
-  const [streamingUserText, setStreamingUserText] = useState('');
+  const [streamingUserText, setStreamingUserText] = useState("");
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
-  const streamingUserTextRef = useRef('');
+  const streamingUserTextRef = useRef("");
 
   const handleServerMessage = useCallback((message: any) => {
     const data = message?.data ?? message;
-    if (data?.type === 'conversation_state_update') {
+    if (data?.type === "conversation_state_update") {
       setCourseState({
         all_topics: data.all_topics || [],
         discussed_topics: data.discussed_topics || [],
         responses: data.responses || {},
         remaining_topics: data.remaining_topics || [],
         current_topics: data.current_topics || [],
-        current_node: data.current_node || 'initial',
-        progress: data.progress || '0/3'
+        current_node: data.current_node || "initial",
+        progress: data.progress || "0/3",
       });
     }
-    if (data?.type === 'structured_data') {
-      console.log('[StructuredData]', JSON.stringify(data.payload, null, 2));
+    if (data?.type === "structured_data") {
+      console.log("[StructuredData]", JSON.stringify(data.payload, null, 2));
     }
   }, []);
 
@@ -62,9 +67,9 @@ function App() {
         streamingUserTextRef.current = data.text;
         setIsUserSpeaking(true);
       } else {
-        setTranscripts(prev => ({ ...prev, user: data.text }));
-        setStreamingUserText('');
-        streamingUserTextRef.current = '';
+        setTranscripts((prev) => ({ ...prev, user: data.text }));
+        setStreamingUserText("");
+        streamingUserTextRef.current = "";
         setIsUserSpeaking(false);
       }
     }
@@ -72,7 +77,7 @@ function App() {
 
   const handleBotTtsText = useCallback((data: any) => {
     if (data?.text && data.text.trim()) {
-      setTranscripts(prev => ({ ...prev, bot: data.text }));
+      setTranscripts((prev) => ({ ...prev, bot: data.text }));
     }
   }, []);
 
@@ -89,14 +94,14 @@ function App() {
   }, []);
 
   const handleConnected = useCallback(() => {
-    setTranscripts({ user: '', bot: '' });
-    setStreamingUserText('');
+    setTranscripts({ user: "", bot: "" });
+    setStreamingUserText("");
     setIsUserSpeaking(false);
     setIsBotSpeaking(false);
   }, []);
 
   const handleDisconnected = useCallback(() => {
-    setStreamingUserText('');
+    setStreamingUserText("");
     setIsUserSpeaking(false);
     setIsBotSpeaking(false);
   }, []);
@@ -106,30 +111,45 @@ function App() {
     if (isUserSpeaking) {
       const timeout = setTimeout(() => {
         if (streamingUserTextRef.current) {
-          setTranscripts(prev => ({ ...prev, user: streamingUserTextRef.current }));
+          setTranscripts((prev) => ({
+            ...prev,
+            user: streamingUserTextRef.current,
+          }));
         }
-        setStreamingUserText('');
-        streamingUserTextRef.current = '';
+        setStreamingUserText("");
+        streamingUserTextRef.current = "";
         setIsUserSpeaking(false);
       }, 5000);
       return () => clearTimeout(timeout);
     }
   }, [isUserSpeaking]);
 
-  const clientOptions = useMemo(() => ({
-    enableMic: true,
-    enableCam: false,
-    callbacks: {
-      onServerMessage: handleServerMessage,
-      onUserTranscript: handleUserTranscript,
-      onBotTtsText: handleBotTtsText,
-      onBotStartedSpeaking: handleBotStartedSpeaking,
-      onBotStoppedSpeaking: handleBotStoppedSpeaking,
-      onUserStartedSpeaking: handleUserStartedSpeaking,
-      onConnected: handleConnected,
-      onDisconnected: handleDisconnected,
-    },
-  }), [handleServerMessage, handleUserTranscript, handleBotTtsText, handleBotStartedSpeaking, handleBotStoppedSpeaking, handleUserStartedSpeaking, handleConnected, handleDisconnected]);
+  const clientOptions = useMemo(
+    () => ({
+      enableMic: true,
+      enableCam: false,
+      callbacks: {
+        onServerMessage: handleServerMessage,
+        onUserTranscript: handleUserTranscript,
+        onBotTtsText: handleBotTtsText,
+        onBotStartedSpeaking: handleBotStartedSpeaking,
+        onBotStoppedSpeaking: handleBotStoppedSpeaking,
+        onUserStartedSpeaking: handleUserStartedSpeaking,
+        onConnected: handleConnected,
+        onDisconnected: handleDisconnected,
+      },
+    }),
+    [
+      handleServerMessage,
+      handleUserTranscript,
+      handleBotTtsText,
+      handleBotStartedSpeaking,
+      handleBotStoppedSpeaking,
+      handleUserStartedSpeaking,
+      handleConnected,
+      handleDisconnected,
+    ],
+  );
 
   const connectParams = useMemo(() => ({}), []);
 
@@ -143,25 +163,25 @@ function App() {
         {({ client }) => {
           const handleConnect = async () => {
             try {
-              if (client.state !== 'disconnected') {
+              if (client.state !== "disconnected") {
                 try {
                   await client.disconnect();
                 } catch (e) {
-                  console.warn('Disconnect failed during reconnect:', e);
+                  console.warn("Disconnect failed during reconnect:", e);
                 }
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise((resolve) => setTimeout(resolve, 500));
               }
-              setTranscripts({ user: '', bot: '' });
+              setTranscripts({ user: "", bot: "" });
               await client.startBotAndConnect({
-                endpoint: '/api/start',
-                requestData: {}
+                endpoint: "/api/start",
+                requestData: {},
               });
             } catch {
-              if (client.state === 'ready' || client.state === 'connecting') {
+              if (client.state === "ready" || client.state === "connecting") {
                 try {
                   await client.disconnect();
                 } catch (e) {
-                  console.warn('Disconnect failed during error recovery:', e);
+                  console.warn("Disconnect failed during error recovery:", e);
                 }
               }
             }
