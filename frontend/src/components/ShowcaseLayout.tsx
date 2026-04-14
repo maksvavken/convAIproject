@@ -73,8 +73,8 @@ const mergeBotText = (existingText: string, newChunk: string): string => {
   if (!incoming) return existing;
   if (!existing) return incoming;
   if (existing === incoming) return existing;
+  if (incoming.startsWith(existing)) return incoming;
   if (existing.endsWith(incoming)) return existing;
-
   return `${existing} ${incoming}`;
 };
 
@@ -187,9 +187,9 @@ const chatTranscriptReducer = (
       };
     }
 
-    case "RESET_CHAT": {
-      return initialChatTranscriptState;
-    }
+    // case "RESET_CHAT": {
+    //   return initialChatTranscriptState;
+    // }
 
     default:
       return state;
@@ -221,6 +221,7 @@ interface ShowcaseLayoutProps extends Partial<PipecatBaseChildProps> {
   courseState?: CourseState;
   transcripts?: { user: string; bot: string };
   isBotSpeaking?: boolean;
+  streamingBotText?: string;
   streamingUserText?: string;
   isUserSpeaking?: boolean;
   handleConnect?: () => Promise<void>;
@@ -239,8 +240,12 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   },
   transcripts = { user: "", bot: "" },
   isBotSpeaking = false,
+  streamingBotText = "",
   isUserSpeaking = false,
 }) => {
+  const currentBotText =
+    streamingBotText?.trim() || transcripts.bot?.trim() || "";
+
   const [chatState, chatDispatch] = useReducer(
     chatTranscriptReducer,
     initialChatTranscriptState,
@@ -360,13 +365,15 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   }, [transcripts.user]);
 
   useEffect(() => {
-    if (transcripts.bot?.trim()) {
-      chatDispatch({
-        type: "BOT_TRANSCRIPT_UPDATED",
-        text: transcripts.bot,
-      });
-    }
-  }, [transcripts.bot]);
+  if (currentBotText) {
+    clearBotFinalizeTimeout();
+
+    chatDispatch({
+      type: "BOT_TRANSCRIPT_UPDATED",
+      text: currentBotText,
+    });
+  }
+}, [currentBotText]);
 
   useEffect(() => {
     if (transportState === "connecting") {

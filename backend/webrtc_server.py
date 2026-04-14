@@ -129,6 +129,49 @@ class StructuredDataProcessor(FrameProcessor):
 
         await self.push_frame(frame, direction)
 
+class BotStreamingTextProcessor(FrameProcessor):
+    def __init__(self):
+        super().__init__()
+        self._buffer = ""
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, LLMFullResponseStartFrame):
+            self._buffer = ""
+            await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, TextFrame):
+            if frame.text:
+                self._buffer += frame.text
+                await self.push_frame(
+                    RTVIServerMessageFrame(
+                        data={
+                            "type": "bot_streaming_text",
+                            "text": self._buffer,
+                        }
+                    ),
+                    direction,
+                )
+            await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, LLMFullResponseEndFrame):
+            await self.push_frame(
+                RTVIServerMessageFrame(
+                    data={
+                        "type": "bot_streaming_text_final",
+                        "text": self._buffer,
+                    }
+                ),
+                direction,
+            )
+            await self.push_frame(frame, direction)
+            return
+
+        await self.push_frame(frame, direction)
+
 class DecimalSafeAggregator(BaseTextAggregator):
     
     def __init__(self):
@@ -621,7 +664,8 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
     course_state_processor = ConversationStateProcessor(course_data)
     # To seperate json from readable text. Used for extracting Nutritional tables and shopping lists
     structured_data_processor = StructuredDataProcessor()
-
+    
+    bot_streaming_processor = BotStreamingTextProcessor()
 
     # Pipeline: audio in -> STT -> mute filter -> LLM -> state updates -> TTS -> audio out
     pipeline = Pipeline(
@@ -634,6 +678,7 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
             rtvi,
             llm,
             structured_data_processor,
+            bot_streaming_processor,
             course_state_processor,
             tts,
             transport.output(),
