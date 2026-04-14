@@ -376,15 +376,31 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
     }
   }, [currentUserText]);
 
-  useEffect(() => {
-    if (currentBotText) {
-      clearBotFinalizeTimeout();
+  const botUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
+  useEffect(() => {
+    if (!currentBotText) return;
+
+    clearBotFinalizeTimeout();
+
+    if (botUpdateTimeoutRef.current) {
+      clearTimeout(botUpdateTimeoutRef.current);
+    }
+
+    botUpdateTimeoutRef.current = setTimeout(() => {
       chatDispatch({
         type: "BOT_TRANSCRIPT_UPDATED",
         text: currentBotText,
       });
-    }
+    }, 200); 
+
+    return () => {
+      if (botUpdateTimeoutRef.current) {
+        clearTimeout(botUpdateTimeoutRef.current);
+      }
+    };
   }, [currentBotText]);
 
   useEffect(() => {
