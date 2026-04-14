@@ -25,6 +25,7 @@ type ChatTranscriptAction =
   | { type: "BOT_TRANSCRIPT_UPDATED"; text: string }
   | { type: "USER_MESSAGE_FINALIZED" }
   | { type: "BOT_MESSAGE_FINALIZED" }
+  | { type: "BOT_MESSAGE_RESET" }
   | { type: "RESET_CHAT" };
 
 interface ChatMessage {
@@ -66,16 +67,18 @@ const mergeUserText = (existingText: string, newText: string): string => {
   return `${existing} ${incoming}`;
 };
 
-const mergeBotText = (existingText: string, newChunk: string): string => {
+const mergeBotText = (existingText: string, newText: string): string => {
   const existing = existingText.trim();
-  const incoming = newChunk.trim();
+  const incoming = newText.trim();
 
   if (!incoming) return existing;
   if (!existing) return incoming;
   if (existing === incoming) return existing;
+
   if (incoming.startsWith(existing)) return incoming;
-  if (existing.endsWith(incoming)) return existing;
-  return `${existing} ${incoming}`;
+  if (existing.startsWith(incoming)) return existing;
+
+  return incoming;
 };
 
 const chatTranscriptReducer = (
@@ -183,6 +186,13 @@ const chatTranscriptReducer = (
             status: "final",
           },
         ],
+        liveBotMessage: null,
+      };
+    }
+
+    case "BOT_MESSAGE_RESET": {
+      return {
+        ...state,
         liveBotMessage: null,
       };
     }
@@ -365,15 +375,15 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   }, [transcripts.user]);
 
   useEffect(() => {
-  if (currentBotText) {
-    clearBotFinalizeTimeout();
+    if (currentBotText) {
+      clearBotFinalizeTimeout();
 
-    chatDispatch({
-      type: "BOT_TRANSCRIPT_UPDATED",
-      text: currentBotText,
-    });
-  }
-}, [currentBotText]);
+      chatDispatch({
+        type: "BOT_TRANSCRIPT_UPDATED",
+        text: currentBotText,
+      });
+    }
+  }, [currentBotText]);
 
   useEffect(() => {
     if (transportState === "connecting") {
