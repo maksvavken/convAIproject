@@ -98,8 +98,10 @@ function App() {
   }, []);
 
   const handleUserStartedSpeaking = useCallback(() => {
-    setIsUserSpeaking(true);
-  }, []);
+  setIsUserSpeaking(true);
+  setStreamingUserText('');
+  setTranscripts(prev => ({ ...prev, user: '' }));
+}, []);
 
   const handleConnected = useCallback(() => {
     setTranscripts({ user: "", bot: "" });

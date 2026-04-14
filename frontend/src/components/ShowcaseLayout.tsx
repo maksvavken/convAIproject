@@ -54,16 +54,19 @@ const mergeUserText = (existingText: string, newText: string): string => {
 
   if (!incoming) return existing;
   if (!existing) return incoming;
-
   if (existing === incoming) return existing;
 
-  // New incoming text is an extension of existing text
   if (incoming.startsWith(existing)) return incoming;
+  if (existing.startsWith(incoming)) return existing;
 
-  // Existing text is an extension of incoming text
-  if (existing.endsWith(incoming)) return existing;
+  const maxOverlap = Math.min(existing.length, incoming.length);
 
-  // Texts are different but not extensions - concatenate with space
+  for (let i = maxOverlap; i > 0; i--) {
+    if (existing.slice(-i) === incoming.slice(0, i)) {
+      return existing + incoming.slice(i);
+    }
+  }
+
   return `${existing} ${incoming}`;
 };
 
@@ -197,9 +200,9 @@ const chatTranscriptReducer = (
       };
     }
 
-    // case "RESET_CHAT": {
-    //   return initialChatTranscriptState;
-    // }
+    case "RESET_CHAT": {
+      return initialChatTranscriptState;
+    }
 
     default:
       return state;
@@ -250,11 +253,15 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   },
   transcripts = { user: "", bot: "" },
   isBotSpeaking = false,
+  streamingUserText = "",
   streamingBotText = "",
   isUserSpeaking = false,
 }) => {
   const currentBotText =
     streamingBotText?.trim() || transcripts.bot?.trim() || "";
+
+  const currentUserText =
+    streamingUserText?.trim() || transcripts.user?.trim() || "";
 
   const [chatState, chatDispatch] = useReducer(
     chatTranscriptReducer,
@@ -328,12 +335,6 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
       clearUserFinalizeTimeout();
     } else if (prevIsUserSpeaking.current && !isUserSpeaking) {
       dispatch({ type: "USER_STOPPED_SPEAKING" });
-
-      clearUserFinalizeTimeout();
-      userFinalizeTimeoutRef.current = setTimeout(() => {
-        chatDispatch({ type: "USER_MESSAGE_FINALIZED" });
-        userFinalizeTimeoutRef.current = null;
-      }, 1000);
     }
 
     prevIsUserSpeaking.current = isUserSpeaking;
@@ -343,6 +344,8 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
     if (!prevIsBotSpeaking.current && isBotSpeaking) {
       dispatch({ type: "BOT_STARTED_SPEAKING" });
       clearBotFinalizeTimeout();
+
+      chatDispatch({ type: "USER_MESSAGE_FINALIZED" });
     } else if (prevIsBotSpeaking.current && !isBotSpeaking) {
       dispatch({ type: "BOT_FINISHED_SPEAKING" });
 
@@ -364,15 +367,15 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   }, [displayedMessages]);
 
   useEffect(() => {
-    if (transcripts.user?.trim()) {
+    if (currentUserText) {
       clearUserFinalizeTimeout();
 
       chatDispatch({
         type: "USER_TRANSCRIPT_UPDATED",
-        text: transcripts.user,
+        text: currentUserText,
       });
     }
-  }, [transcripts.user]);
+  }, [currentUserText]);
 
   useEffect(() => {
     if (currentBotText) {
