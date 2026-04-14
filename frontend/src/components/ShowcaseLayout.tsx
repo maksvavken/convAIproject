@@ -257,8 +257,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   streamingBotText = "",
   isUserSpeaking = false,
 }) => {
-  const currentBotText =
-    streamingBotText?.trim() || transcripts.bot?.trim() || "";
+  const currentBotText = streamingBotText?.trim() || "";
 
   const currentUserText =
     streamingUserText?.trim() || transcripts.user?.trim() || "";
