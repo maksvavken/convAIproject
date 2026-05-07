@@ -25,7 +25,7 @@ export function Header({ rightAccessory }: HeaderProps) {
                 {CONVERSATION_INFO_DISPLAYED.pageTitleDescription}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-12">
               {rightAccessory}
               <ClientStatus />
             </div>

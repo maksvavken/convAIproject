@@ -3,55 +3,55 @@ import { Plasma } from "@pipecat-ai/voice-ui-kit/webgl";
 import type { PlasmaRef } from "@pipecat-ai/voice-ui-kit/webgl";
 
 const subtleConfig = {
-  backgroundColor: "#22c55e",
-  ringBounce: 0.15,
-  ringAmplitude: 0.08,
-  ringThicknessAudio: 4,
-  audioSensitivity: 0.3,
-  plasmaVolumeReactivity: 0.4,
-  effectScale: 0.45,
+  backgroundColor: "#dcfce7",
+  ringBounce: 0.12,
+  ringAmplitude: 0.06,
+  ringThicknessAudio: 5,
+  audioSensitivity: 0.45,
+  plasmaVolumeReactivity: 0.35,
+  effectScale: 0.5,
   ringDistance: 0,
-  ringVariance: 0.2,
-  ringVisibility: 0.6,
-  ringSegments: 5,
+  ringVariance: 0.18,
+  ringVisibility: 0.5,
+  ringSegments: 6,
   ringThickness: 3,
-  ringSpread: 0.06,
-  colorCycleSpeed: 0.15,
-  intensity: 0.7,
+  ringSpread: 0.08,
+  colorCycleSpeed: 0.1,
+  intensity: 0.75,
   radius: 1.0,
-  glowFalloff: 1,
+  glowFalloff: 1.25,
   glowThreshold: 0,
-  plasmaSpeed: 0.12,
-  rayLength: 0.6,
-  color1: "#6b7280",
-  color2: "#4b5563",
-  color3: "#374151",
+  plasmaSpeed: 0.08,
+  rayLength: 0.55,
+  color1: "#bbf7d0",
+  color2: "#4ade80",
+  color3: "#16a34a",
 };
 
 const activeConfig = {
-  backgroundColor: "#22c55e",
-  ringBounce: 0.4,
-  ringAmplitude: 0.15,
-  ringThicknessAudio: 15,
-  audioSensitivity: 1.8,
-  plasmaVolumeReactivity: 1.8,
-  effectScale: 0.55,
+  backgroundColor: "#bbf7d0",
+  ringBounce: 0.32,
+  ringAmplitude: 0.18,
+  ringThicknessAudio: 10,
+  audioSensitivity: 1.5,
+  plasmaVolumeReactivity: 1.45,
+  effectScale: 0.62,
   ringDistance: 0,
-  ringVariance: 0.35,
-  ringVisibility: 0.32,
-  ringSegments: 6,
+  ringVariance: 0.28,
+  ringVisibility: 0.42,
+  ringSegments: 7,
   ringThickness: 4,
-  ringSpread: 0.1,
-  colorCycleSpeed: 0.25,
-  intensity: 1.3,
+  ringSpread: 0.12,
+  colorCycleSpeed: 0.18,
+  intensity: 1.2,
   radius: 1.0,
-  glowFalloff: 1.5,
+  glowFalloff: 1.35,
   glowThreshold: 0,
-  plasmaSpeed: 0.22,
-  rayLength: 1.0,
-  color1: "#22d3ee",
-  color2: "#34d399",
-  color3: "#818cf8",
+  plasmaSpeed: 0.18,
+  rayLength: 0.85,
+  color1: "#86efac",
+  color2: "#22c55e",
+  color3: "#15803d",
 };
 
 interface VisualizerPanelProps {
@@ -172,11 +172,13 @@ export function VisualizerPanel({
   }, [transportState]);
   return (
     <div
-      className={`bg-white backdrop-blur-sm rounded-lg ${
-        compact ? "w-12 h-12 p-2" : "p-4"
+      className={`bg-white backdrop-blur-sm ${
+        compact
+          ? "w-12 h-12 p-2 rounded-full border border-emerald-100 shadow-[0_0_14px_rgba(34,197,94,0.22)]"
+          : "rounded-lg p-4"
       } flex flex-col`}
     >
-      <div className="relative aspect-square flex items-center justify-center rounded-full overflow-hidden">
+      <div className="relative aspect-square flex items-center justify-center rounded-full overflow-hidden bg-emerald-50">
         {visualizerType === "plasma" ? (
         <>
           <Plasma
@@ -195,7 +197,7 @@ export function VisualizerPanel({
             {micBars.map((height, i) => (
               <div
                 key={`mic-${i}`}
-                className="w-2 bg-purple-500 rounded-t transition-all duration-100"
+                className="w-2 bg-emerald-400 rounded-t transition-all duration-100"
                 style={{
                   height: `${height}%`,
                   opacity: transportState === "ready" ? 1 : 0.3,
@@ -203,7 +205,7 @@ export function VisualizerPanel({
               />
             ))}
           </div>
-          <div className="text-xs text-center py-2 text-purple-600 font-medium">
+          <div className="text-xs text-center py-2 text-emerald-600 font-medium">
             Your Voice
           </div>
           <div className="flex-1 flex items-start justify-center gap-1">
