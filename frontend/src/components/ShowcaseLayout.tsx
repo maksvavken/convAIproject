@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useReducer } from "react";
+import React, { useEffect, useRef, useReducer } from "react";
 import { Bot, User } from "lucide-react";
 import {
   usePipecatClient,
@@ -271,7 +271,16 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
   return (
     <div className="h-screen bg-white text-gray-900 flex flex-col overflow-hidden">
-      <Header />
+      <Header
+        rightAccessory={
+          <VisualizerPanel
+            transportState={transportState}
+            botAudioTrack={botAudioTrack}
+            visualizerType={CONVERSATION_INFO_DISPLAYED.visualizerType}
+            compact
+          />
+        }
+      />
 
       {/* Main Content */}
 
@@ -433,16 +442,6 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
               isMicEnabled={isMicEnabled}
               disabled={!isConnected}
             />
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
-              {/* Left - Visualizer Plasma */}
-              <div className="lg:col-span-3">
-                <VisualizerPanel
-                  transportState={transportState}
-                  botAudioTrack={botAudioTrack}
-                  visualizerType={CONVERSATION_INFO_DISPLAYED.visualizerType}
-                />
-              </div>
-            </div>
           </div>
         </div>
       )}

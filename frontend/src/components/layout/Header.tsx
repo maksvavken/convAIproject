@@ -1,8 +1,13 @@
 import {Leaf} from "lucide-react";
 import { CONVERSATION_INFO_DISPLAYED } from "../../conversationInfoDisplayed";
 import { ClientStatus } from "@pipecat-ai/voice-ui-kit";
+import type { ReactNode } from "react";
 
-export function Header() {
+interface HeaderProps {
+  rightAccessory?: ReactNode;
+}
+
+export function Header({ rightAccessory }: HeaderProps) {
     return (
         <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-card/80 backdrop-blur-xl">
         <div className="flex items-center gap-3 w-full">
@@ -20,7 +25,10 @@ export function Header() {
                 {CONVERSATION_INFO_DISPLAYED.pageTitleDescription}
               </p>
             </div>
-            <ClientStatus />
+            <div className="flex items-center gap-2">
+              {rightAccessory}
+              <ClientStatus />
+            </div>
           </div>
         </div>
       </header>

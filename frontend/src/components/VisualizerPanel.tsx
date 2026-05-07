@@ -58,12 +58,14 @@ interface VisualizerPanelProps {
     transportState: string;
     botAudioTrack?: MediaStreamTrack;
     visualizerType: "plasma" | "waveform";
+    compact?: boolean;
   }
 
 export function VisualizerPanel({
   transportState,
   botAudioTrack,
   visualizerType,
+  compact = false,
 }: VisualizerPanelProps) {
   const plasmaRef = useRef<PlasmaRef>(null);
 
@@ -169,7 +171,11 @@ export function VisualizerPanel({
     }
   }, [transportState]);
   return (
-    <div className="bg-white backdrop-blur-sm rounded-lg p-4 flex flex-col">
+    <div
+      className={`bg-white backdrop-blur-sm rounded-lg ${
+        compact ? "w-12 h-12 p-2" : "p-4"
+      } flex flex-col`}
+    >
       <div className="relative aspect-square flex items-center justify-center rounded-full overflow-hidden">
         {visualizerType === "plasma" ? (
         <>
