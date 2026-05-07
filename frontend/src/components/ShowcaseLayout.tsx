@@ -316,8 +316,8 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
           {/* Middle - Controls + Topics + Current Turn */}
           <div className="lg:col-span-6 space-y-6 max-h-[300px]">
             {/* Course Topics */}
-            <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-indigo-300 shadow-lg">
-              <h2 className="text-lg font-bold mb-1 text-center text-indigo-900">
+            <div className="bg-white backdrop-blur-sm rounded-lg p-4 border border-green-300 shadow-lg">
+              <h2 className="text-lg font-bold mb-1 text-center text-green-900">
                 {courseState.current_node === "questions"
                   ? "Q&A Mode"
                   : "Ask about Nutrition"}
