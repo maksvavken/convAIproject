@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useReducer } from "react";
+import React, { useEffect, useRef, useReducer, useState } from "react";
 import { Bot, User } from "lucide-react";
 import {
   usePipecatClient,
@@ -16,9 +16,11 @@ import { appStateReducer } from "../state/appStateReducer";
 import { Header } from "./layout/Header";
 import { VisualizerPanel } from "./VisualizerPanel";
 import { ChatInput } from "./ChatInput";
+import { ChatHistorySidebar } from "./ChatHistorySidebar";
 import {
   chatTranscriptReducer,
   initialChatTranscriptState,
+  type ChatMessage,
 } from "../state/chatTranscript";
 
 
@@ -79,12 +81,22 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
     chatTranscriptReducer,
     initialChatTranscriptState,
   );
+  const [selectedHistorySessionId, setSelectedHistorySessionId] = useState<
+    string | undefined
+  >();
+  const [selectedHistoryMessages, setSelectedHistoryMessages] = useState<
+    ChatMessage[]
+  >([]);
 
-  const displayedMessages = [
+  const isViewingHistory = !!selectedHistorySessionId;
+  const liveDisplayedMessages = [
     ...chatState.messages,
     ...(chatState.liveUserMessage ? [chatState.liveUserMessage] : []),
     ...(chatState.liveBotMessage ? [chatState.liveBotMessage] : []),
   ].sort((a, b) => a.timestamp - b.timestamp);
+  const displayedMessages = isViewingHistory
+    ? selectedHistoryMessages
+    : liveDisplayedMessages;
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -96,10 +108,12 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   const [appState, dispatch] = useReducer(appStateReducer, "disconnected");
 
   const handleMicToggle = () => {
+    if (isViewingHistory) return;
     enableMic(!isMicEnabled);
   };
 
   const handleTextSubmit = async (text: string) => {
+    if (isViewingHistory) return;
     if (!client || client.state !== "ready") return;
 
     await client.sendText(text, {
@@ -112,6 +126,20 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
       text,
     });
     chatDispatch({ type: "USER_MESSAGE_FINALIZED" });
+  };
+
+  const handleSelectHistorySession = (
+    sessionId: string,
+    messages: ChatMessage[],
+  ) => {
+    setSelectedHistorySessionId(sessionId);
+    setSelectedHistoryMessages([...messages].sort((a, b) => a.timestamp - b.timestamp));
+  };
+
+  const handleNewChat = () => {
+    setSelectedHistorySessionId(undefined);
+    setSelectedHistoryMessages([]);
+    chatDispatch({ type: "RESET_CHAT" });
   };
 
   const onConnectClick = async () => {
@@ -296,6 +324,12 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
           />
         }
       />
+      <ChatHistorySidebar
+        messages={chatState.messages}
+        selectedSessionId={selectedHistorySessionId}
+        onSelectSession={handleSelectHistorySession}
+        onNewChat={handleNewChat}
+      />
 
       {/* Main Content */}
 
@@ -456,7 +490,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
               onMicToggle={handleMicToggle}
               isMicEnabled={isMicEnabled}
               onSubmit={handleTextSubmit}
-              disabled={!isConnected}
+              disabled={!isConnected || isViewingHistory}
             />
           </div>
         </div>
