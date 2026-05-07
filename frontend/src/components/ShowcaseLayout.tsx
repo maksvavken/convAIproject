@@ -35,7 +35,7 @@ interface CourseState {
 const getTopicInfo = (topic: string): TopicInfo => {
   return (
     CONVERSATION_INFO_DISPLAYED.topics[topic] || {
-      description: "Course information",
+      description: "Nutrional information",
       details: [],
       link: "",
       image: "",
@@ -97,6 +97,21 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
   const handleMicToggle = () => {
     enableMic(!isMicEnabled);
+  };
+
+  const handleTextSubmit = async (text: string) => {
+    if (!client || client.state !== "ready") return;
+
+    await client.sendText(text, {
+      run_immediately: true,
+      audio_response: true,
+    });
+
+    chatDispatch({
+      type: "USER_TRANSCRIPT_UPDATED",
+      text,
+    });
+    chatDispatch({ type: "USER_MESSAGE_FINALIZED" });
   };
 
   const onConnectClick = async () => {
@@ -440,6 +455,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
             <ChatInput
               onMicToggle={handleMicToggle}
               isMicEnabled={isMicEnabled}
+              onSubmit={handleTextSubmit}
               disabled={!isConnected}
             />
           </div>
