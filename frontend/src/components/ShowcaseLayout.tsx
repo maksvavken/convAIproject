@@ -78,6 +78,13 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 }) => {
   const currentBotText = streamingBotText?.trim() || "";
 
+  const stripStructuredTail = (text: string): string => {
+    const markerMatch = text.match(
+      /^(.*?)(?:-{2,3}\s*JSON(?:-+)?|```json)\b/is,
+    );
+    return markerMatch ? markerMatch[1].trim() : text.trim();
+  };
+
   const currentUserText =
     streamingUserText?.trim() || transcripts.user?.trim() || "";
 
@@ -113,7 +120,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   }, [structuredData]);
 
   useEffect(() => {
-    // Check if the latest bot message contains --JSON or ---JSON---
+    // Check if the latest bot message contains a structured marker.
     const lastMessage = displayedMessages[displayedMessages.length - 1];
     
     // Debug log to see what's being received
@@ -122,8 +129,12 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
       console.log("Last bot message status:", lastMessage.status);
     }
 
-    if (lastMessage && lastMessage.speaker === "bot" && (lastMessage.text.includes("--JSON") || lastMessage.text.includes("---JSON---"))) {
-      const parts = lastMessage.text.split(/---?JSON---?/);
+    if (
+      lastMessage &&
+      lastMessage.speaker === "bot" &&
+      /-{2,3}\s*JSON(?:-+)?|```json/i.test(lastMessage.text)
+    ) {
+      const parts = lastMessage.text.split(/-{2,3}\s*JSON(?:-+)?|```json/i);
       // We look at the last part for the JSON structure
       let potentialJson = parts[parts.length - 1].trim();
       
@@ -538,7 +549,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                         <div className="max-w-[70%] p-2 rounded-lg bg-gray-50 shadow">
                           <div className="text-sm text-black prose prose-sm max-w-none">
                             <ReactMarkdown>
-                              {msg.text.split(/---?JSON---?/)[0].trim()}
+                              {stripStructuredTail(msg.text)}
                             </ReactMarkdown>
                           </div>
                         </div>

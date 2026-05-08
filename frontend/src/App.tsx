@@ -43,6 +43,13 @@ function App() {
   const [streamingBotText, setStreamingBotText] = useState("");
   const [structuredData, setStructuredData] = useState<any>(null);
 
+  const stripStructuredTail = useCallback((text: string): string => {
+    const markerMatch = text.match(
+      /^(.*?)(?:-{2,3}\s*JSON(?:-+)?|```json)\b/is,
+    );
+    return markerMatch ? markerMatch[1].trim() : text.trim();
+  }, []);
+
   const handleServerMessage = useCallback((message: any) => {
     const data = message?.data ?? message;
     if (data?.type === "conversation_state_update") {
@@ -87,9 +94,13 @@ function App() {
 
   const handleBotTtsText = useCallback((data: any) => {
     if (data?.text && data.text.trim()) {
-      setTranscripts((prev) => ({ ...prev, bot: data.text }));
+      const cleanText = stripStructuredTail(data.text);
+      
+      if (cleanText) {
+        setTranscripts((prev) => ({ ...prev, bot: cleanText }));
+      }
     }
-  }, []);
+  }, [stripStructuredTail]);
 
   const handleBotStartedSpeaking = useCallback(() => {
     setIsBotSpeaking(true);

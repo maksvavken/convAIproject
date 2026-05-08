@@ -59,23 +59,26 @@ const mergeUserText = (existingText: string, newText: string): string => {
   return `${existing} ${incoming}`;
 };
 
+const stripStructuredTail = (text: string): string => {
+  // Cut at the first structured marker and drop the marker itself.
+  const markerMatch = text.match(/^(.*?)(?:-{2,3}\s*JSON(?:-+)?|```json)\b/is);
+  return markerMatch ? markerMatch[1].trim() : text.trim();
+};
+
 const mergeBotText = (existingText: string, newText: string): string => {
   const existing = existingText.trim();
-  let incoming = newText.trim();
+  const incoming = stripStructuredTail(newText);
 
-  // Strip --JSON and everything after it from the text
-  // This prevents it from being displayed or being processed by TTS
-  if (incoming.includes("--JSON")) {
-    incoming = incoming.split("--JSON")[0].trim();
-  } else if (incoming.includes("---JSON---")) {
-    incoming = incoming.split("---JSON---")[0].trim();
-  }
-
-  if (!incoming) return existing;
+  // If the total text now looks identical or smaller, keep the existing text
+  if (!incoming && existing) return existing;
+  if (!incoming) return "";
   if (!existing) return incoming;
-  if (existing === incoming) return existing;
-
-  if (incoming.startsWith(existing)) return incoming;
+  
+  // If incoming is a full replacement stream update, keep it sanitized.
+  if (incoming.startsWith(existing)) {
+    return incoming;
+  }
+  
   if (existing.startsWith(incoming)) return existing;
 
   return incoming;
@@ -121,8 +124,14 @@ const chatTranscriptReducer = (
     }
 
     case "BOT_TRANSCRIPT_UPDATED": {
-      const text = action.text.trim();
+      const text = stripStructuredTail(action.text);
       if (!text) return state;
+
+      // If text is now empty but we are in the middle of a message,
+      // we might have hit the structured block. Keep existing text.
+      if (!text && state.liveBotMessage) {
+        return state;
+      }
 
       if (!state.liveBotMessage) {
         const now = Date.now();
