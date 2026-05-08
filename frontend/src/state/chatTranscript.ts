@@ -61,7 +61,15 @@ const mergeUserText = (existingText: string, newText: string): string => {
 
 const mergeBotText = (existingText: string, newText: string): string => {
   const existing = existingText.trim();
-  const incoming = newText.trim();
+  let incoming = newText.trim();
+
+  // Strip --JSON and everything after it from the text
+  // This prevents it from being displayed or being processed by TTS
+  if (incoming.includes("--JSON")) {
+    incoming = incoming.split("--JSON")[0].trim();
+  } else if (incoming.includes("---JSON---")) {
+    incoming = incoming.split("---JSON---")[0].trim();
+  }
 
   if (!incoming) return existing;
   if (!existing) return incoming;

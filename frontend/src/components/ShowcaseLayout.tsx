@@ -55,6 +55,7 @@ interface ShowcaseLayoutProps extends Partial<PipecatBaseChildProps> {
   streamingUserText?: string;
   isUserSpeaking?: boolean;
   handleConnect?: () => Promise<void>;
+  structuredData?: any;
 }
 
 const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
@@ -73,6 +74,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   streamingUserText = "",
   streamingBotText = "",
   isUserSpeaking = false,
+  structuredData,
 }) => {
   const currentBotText = streamingBotText?.trim() || "";
 
@@ -91,7 +93,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   >([]);
 
   const [sidebarData, setSidebarData] = useState<any>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const isViewingHistory = !!selectedHistorySessionId;
   const liveDisplayedMessages = [
@@ -102,6 +104,13 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   const displayedMessages = isViewingHistory
     ? selectedHistoryMessages
     : liveDisplayedMessages;
+
+  useEffect(() => {
+    if (structuredData) {
+      setSidebarData(structuredData);
+      setIsSidebarOpen(true);
+    }
+  }, [structuredData]);
 
   useEffect(() => {
     // Check if the latest bot message contains --JSON or ---JSON---
@@ -377,6 +386,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
       />
       <ShoppingListOrRecipeSidebar
         isOpen={isSidebarOpen}
+        onOpen={() => setIsSidebarOpen(true)}
         onClose={() => setIsSidebarOpen(false)}
         data={sidebarData}
       />

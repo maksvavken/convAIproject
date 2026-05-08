@@ -41,6 +41,7 @@ function App() {
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const streamingUserTextRef = useRef("");
   const [streamingBotText, setStreamingBotText] = useState("");
+  const [structuredData, setStructuredData] = useState<any>(null);
 
   const handleServerMessage = useCallback((message: any) => {
     const data = message?.data ?? message;
@@ -57,6 +58,7 @@ function App() {
     }
     if (data?.type === "structured_data") {
       console.log("[StructuredData]", JSON.stringify(data.payload, null, 2));
+      setStructuredData(data.payload);
     }
     if (data?.type === "bot_streaming_text") {
       setStreamingBotText(data.text || "");
@@ -206,6 +208,7 @@ function App() {
               streamingUserText={streamingUserText}
               streamingBotText={streamingBotText}
               isUserSpeaking={isUserSpeaking}
+              structuredData={structuredData}
             />
           );
         }}
