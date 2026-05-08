@@ -24,7 +24,15 @@ interface ChatTranscriptState {
 }
 
 const initialChatTranscriptState: ChatTranscriptState = {
-  messages: [],
+  messages: [
+    {
+      id: "initial-greeting",
+      speaker: "bot",
+      text: "Hi! I'm your AI Nutrition Expert. I can help you with diet recommendations or specific food nutrition data. Would you like to start with some diet recommendations, like the Mediterranean diet?",
+      status: "final",
+      timestamp: Date.now(),
+    },
+  ],
   liveUserMessage: null,
   liveBotMessage: null,
 };

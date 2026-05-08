@@ -47,13 +47,17 @@ export function ChatHistorySidebar({
   const sessionIdRef = useRef(`chat-${Date.now()}`);
   const previousMessageCountRef = useRef(0);
 
+  const resetSessionId = () => {
+    sessionIdRef.current = `chat-${Date.now()}`;
+  };
+
   useEffect(() => {
     setSessions(loadSessions());
   }, []);
 
   useEffect(() => {
     if (previousMessageCountRef.current > 0 && messages.length === 0) {
-      sessionIdRef.current = `chat-${Date.now()}`;
+      resetSessionId();
     }
     previousMessageCountRef.current = messages.length;
 
@@ -76,6 +80,11 @@ export function ChatHistorySidebar({
     });
   }, [messages]);
 
+  const handleNewChatClick = () => {
+    resetSessionId();
+    onNewChat();
+  };
+
   return (
     <aside
       className={`fixed left-0 top-20 z-20 flex h-[calc(100vh-5rem)] transition-transform duration-200 ${
@@ -87,7 +96,7 @@ export function ChatHistorySidebar({
           <h2 className="text-sm font-semibold text-green-900">Chat History</h2>
           <button
             type="button"
-            onClick={onNewChat}
+            onClick={handleNewChatClick}
             className="flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700"
           >
             <Plus className="h-3.5 w-3.5" />

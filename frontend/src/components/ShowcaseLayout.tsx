@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useReducer, useState } from "react";
 import { Bot, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import {
   usePipecatClient,
   usePipecatClientMediaTrack,
@@ -460,7 +461,9 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                     >
                       <div className="flex justify-end">
                         <div className="max-w-[70%] p-2 rounded-lg bg-green-500 shadow">
-                          <div className="text-sm text-white">{msg.text}</div>
+                          <div className="text-sm text-white prose prose-invert prose-sm max-w-none">
+                            <ReactMarkdown>{msg.text}</ReactMarkdown>
+                          </div>
                         </div>
                       </div>
                       <div className="w-8 h-8 rounded-full border border-green-300 bg-white flex items-center justify-center shrink-0">
@@ -474,7 +477,9 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                           <Bot className="w-5 h-5" />
                         </div>
                         <div className="max-w-[70%] p-2 rounded-lg bg-gray-50 shadow">
-                          <div className="text-sm text-black">{msg.text}</div>
+                          <div className="text-sm text-black prose prose-sm max-w-none">
+                            <ReactMarkdown>{msg.text}</ReactMarkdown>
+                          </div>
                         </div>
                       </div>
                     </div>
