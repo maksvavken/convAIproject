@@ -18,6 +18,7 @@ import { Header } from "./layout/Header";
 import { VisualizerPanel } from "./VisualizerPanel";
 import { ChatInput } from "./ChatInput";
 import { ChatHistorySidebar } from "./ChatHistorySidebar";
+import { ShoppingListOrRecipeSidebar } from "./ShoppingListSidebar";
 import {
   chatTranscriptReducer,
   initialChatTranscriptState,
@@ -89,6 +90,9 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
     ChatMessage[]
   >([]);
 
+  const [sidebarData, setSidebarData] = useState<any>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
   const isViewingHistory = !!selectedHistorySessionId;
   const liveDisplayedMessages = [
     ...chatState.messages,
@@ -98,6 +102,46 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   const displayedMessages = isViewingHistory
     ? selectedHistoryMessages
     : liveDisplayedMessages;
+
+  useEffect(() => {
+    // Check if the latest bot message contains --JSON or ---JSON---
+    const lastMessage = displayedMessages[displayedMessages.length - 1];
+    
+    // Debug log to see what's being received
+    if (lastMessage && lastMessage.speaker === "bot") {
+      console.log("Last bot message text:", lastMessage.text);
+      console.log("Last bot message status:", lastMessage.status);
+    }
+
+    if (lastMessage && lastMessage.speaker === "bot" && (lastMessage.text.includes("--JSON") || lastMessage.text.includes("---JSON---"))) {
+      const parts = lastMessage.text.split(/---?JSON---?/);
+      // We look at the last part for the JSON structure
+      let potentialJson = parts[parts.length - 1].trim();
+      
+      // If the last part is empty or just whitespace, it might be in the middle part if the bot added text AFTER the JSON
+      if (potentialJson.length < 2 && parts.length > 2) {
+        potentialJson = parts[parts.length - 2].trim();
+      }
+
+      const firstBrace = potentialJson.indexOf('{');
+      const lastBrace = potentialJson.lastIndexOf('}');
+
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        let jsonPart = potentialJson.substring(firstBrace, lastBrace + 1);
+        
+        console.log("Extracted JSON part (after finding braces):", jsonPart);
+        try {
+          const parsed = JSON.parse(jsonPart);
+          setSidebarData(parsed);
+          setIsSidebarOpen(true);
+        } catch (e) {
+          console.error("Failed to parse JSON content", e);
+        }
+      } else {
+        console.warn("Found JSON marker but no valid JSON object structure found. Text was:", potentialJson);
+      }
+    }
+  }, [displayedMessages]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -331,6 +375,11 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
         onSelectSession={handleSelectHistorySession}
         onNewChat={handleNewChat}
       />
+      <ShoppingListOrRecipeSidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        data={sidebarData}
+      />
 
       {/* Main Content */}
 
@@ -478,7 +527,9 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
                         </div>
                         <div className="max-w-[70%] p-2 rounded-lg bg-gray-50 shadow">
                           <div className="text-sm text-black prose prose-sm max-w-none">
-                            <ReactMarkdown>{msg.text}</ReactMarkdown>
+                            <ReactMarkdown>
+                              {msg.text.split(/---?JSON---?/)[0].trim()}
+                            </ReactMarkdown>
                           </div>
                         </div>
                       </div>
