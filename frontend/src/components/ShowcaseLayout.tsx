@@ -262,15 +262,18 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
 
   useEffect(() => {
     if (!prevIsBotSpeaking.current && isBotSpeaking) {
+      console.log("[BOT_SPEAKING_EFFECT] Bot started speaking");
       dispatch({ type: "BOT_STARTED_SPEAKING" });
       clearBotFinalizeTimeout();
 
       chatDispatch({ type: "USER_MESSAGE_FINALIZED" });
     } else if (prevIsBotSpeaking.current && !isBotSpeaking) {
+      console.log("[BOT_SPEAKING_EFFECT] Bot stopped speaking, scheduling BOT_MESSAGE_FINALIZED in 1s");
       dispatch({ type: "BOT_FINISHED_SPEAKING" });
 
       clearBotFinalizeTimeout();
       botFinalizeTimeoutRef.current = setTimeout(() => {
+        console.log("[BOT_SPEAKING_EFFECT] Firing BOT_MESSAGE_FINALIZED");
         chatDispatch({ type: "BOT_MESSAGE_FINALIZED" });
         botFinalizeTimeoutRef.current = null;
       }, 1000);
@@ -302,7 +305,13 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
   );
 
   useEffect(() => {
-    if (!currentBotText) return;
+    if (!currentBotText) {
+      console.log("[BOT_TEXT_EFFECT] currentBotText is empty, clearing finalize timeout");
+      clearBotFinalizeTimeout();
+      return;
+    }
+
+    console.log(`[BOT_TEXT_EFFECT] Scheduling BOT_TRANSCRIPT_UPDATED with text: "${currentBotText.substring(0, 50)}..."`);
 
     clearBotFinalizeTimeout();
 
@@ -311,6 +320,7 @@ const ShowcaseLayout: React.FC<ShowcaseLayoutProps> = ({
     }
 
     botUpdateTimeoutRef.current = setTimeout(() => {
+      console.log(`[BOT_TEXT_EFFECT] Firing BOT_TRANSCRIPT_UPDATED with text: "${currentBotText.substring(0, 50)}..."`);
       chatDispatch({
         type: "BOT_TRANSCRIPT_UPDATED",
         text: currentBotText,

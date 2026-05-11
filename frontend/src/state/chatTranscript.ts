@@ -24,15 +24,7 @@ interface ChatTranscriptState {
 }
 
 const initialChatTranscriptState: ChatTranscriptState = {
-  messages: [
-    {
-      id: "initial-greeting",
-      speaker: "bot",
-      text: "Hi! I'm your AI Nutrition Expert. I can help you with diet recommendations or specific food nutrition data. Would you like to start with some diet recommendations, like the Mediterranean diet?",
-      status: "final",
-      timestamp: Date.now(),
-    },
-  ],
+  messages: [],
   liveUserMessage: null,
   liveBotMessage: null,
 };
@@ -88,6 +80,15 @@ const chatTranscriptReducer = (
   state: ChatTranscriptState,
   action: ChatTranscriptAction,
 ): ChatTranscriptState => {
+  // Debug logging for first message duplication
+  if (action.type === "BOT_TRANSCRIPT_UPDATED" || action.type === "BOT_MESSAGE_FINALIZED") {
+    console.log(`[CHAT_REDUCER] ${action.type}`, {
+      liveMessages: state.messages.length,
+      hasLiveBotMessage: !!state.liveBotMessage,
+      action: action.type === "BOT_TRANSCRIPT_UPDATED" ? action.text : "FINALIZED"
+    });
+  }
+
   switch (action.type) {
     case "USER_TRANSCRIPT_UPDATED": {
       const text = action.text.trim();
