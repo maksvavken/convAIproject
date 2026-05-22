@@ -73,6 +73,33 @@ emb_fn = embedding_functions.OpenAIEmbeddingFunction(
     model_name="text-embedding-3-small"
 )
 
+WORD_TO_NUM = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "twenty": 20
+}
+
+def extract_requested_count(text: str, default: int = 10) -> int:
+    text_lower = text.lower()
+
+    if re.search(r'\bhow (much|many)\b|\bnutrients? (of|in)\b|\bwhat.*contain', text_lower):
+        return 3
+
+    if re.search(r'\brecipe\b|\bmeal\b|\bdinner\b|\blunch\b|\bbreakfast\b', text_lower):
+        return 15
+
+    match = re.search(r'\b(\d+)\b', text_lower)
+    if match:
+        n = int(match.group(1))
+        if 1 <= n <= 50:
+            return n
+
+    for word, num in WORD_TO_NUM.items():
+        if re.search(rf'\b{word}\b', text_lower):
+            return num
+
+    return default
+
 class StructuredDataProcessor(FrameProcessor):
     """
     Intercepts LLM text output, extracts any ---JSON--- block,
@@ -211,7 +238,8 @@ class NutritionRAGProcessor(FrameProcessor):
         if isinstance(frame, TranscriptionFrame):
             user_text = frame.text
             #logger.info(f"RAG: Querying database for: {user_text}")
-            retrieved_context = query_nutrition_data(user_text)
+            n = extract_requested_count(user_text)
+            retrieved_context = query_nutrition_data(query_text=user_text, n_results=n)
             self.last_retrieved_context = retrieved_context
             #logger.info(f"RAG: Retrieved {len(retrieved_context)} chars")
             
@@ -726,6 +754,9 @@ def query_nutrition_data(query_text: str, n_results: int = 10):
     try:
         client = chromadb.PersistentClient(path="./chroma_db")
         collection = client.get_collection(name="nutrition_data", embedding_function=emb_fn)
+        
+        count = collection.count()
+        n_results = min(n_results, count)
         
         results = collection.query(
             query_texts=[query_text],
