@@ -339,6 +339,19 @@ def create_tts_service():
     else:
         raise ValueError(f"Unsupported TTS provider: {provider}. Supported: azure, deepgram, openai, elevenlabs")
 
+# ============= Conversation Configuration =============
+user_profile = {
+    "allergies": [],
+    "diet": None,
+    "goal": None,
+    "dislikes": [],
+    "medical_conditions": [],
+    "calorie_target": None,
+
+    "profile_complete": False,
+    "current_question": 0
+}
+
 # Conversation state storage (topic list comes from conversation_config.py)
 course_data = {
     "all_topics": CONVERSATION_CONFIG["topics"],
@@ -346,12 +359,57 @@ course_data = {
     "responses": {},
     "current_topics": [],
     "current_node": "initial",
-    "rag_processor": None
+    "rag_processor": None,
+    "user_profile": user_profile
 }
-
 
 # ============= Custom Frame Processors =============
 
+def build_profile_context_string() -> str:
+    """Build a human-readable profile summary to inject into LLM system prompts.
+    
+    Returns an empty string if no profile data has been collected yet,
+    so nodes are not polluted with empty/useless context.
+    """
+    profile = course_data["user_profile"]
+ 
+    parts = []
+ 
+    if profile.get("allergies"):
+        allergies = profile["allergies"]
+        if isinstance(allergies, list):
+            parts.append(f"- Allergies: {', '.join(allergies)}")
+        else:
+            parts.append(f"- Allergies: {allergies}")
+ 
+    if profile.get("diet"):
+        parts.append(f"- Diet: {profile['diet']}")
+ 
+    if profile.get("goal"):
+        parts.append(f"- Nutrition goal: {profile['goal']}")
+ 
+    if profile.get("dislikes"):
+        dislikes = profile["dislikes"]
+        if isinstance(dislikes, list):
+            parts.append(f"- Dislikes / foods to avoid: {', '.join(dislikes)}")
+        else:
+            parts.append(f"- Dislikes / foods to avoid: {dislikes}")
+ 
+    if profile.get("medical_conditions"):
+        conditions = profile["medical_conditions"]
+        if isinstance(conditions, list) and conditions:
+            parts.append(f"- Medical conditions: {', '.join(conditions)}")
+        elif isinstance(conditions, str) and conditions:
+            parts.append(f"- Medical conditions: {conditions}")
+ 
+    if profile.get("calorie_target"):
+        parts.append(f"- Daily calorie target: {profile['calorie_target']} kcal")
+ 
+    if not parts:
+        return ""
+ 
+    header = "### USER PROFILE (use this to personalise every recommendation):\n"
+    return header + "\n".join(parts) + "\n"
 
 class ConversationStateProcessor(FrameProcessor):
     """Sends conversation state updates to the frontend via RTVI messages.
@@ -553,6 +611,98 @@ def create_dynamic_topic_function() -> FlowsFunctionSchema:
         },
     )
 
+def create_save_profile_answer_function() -> FlowsFunctionSchema:
+    """Create a function for the profile node to save a single answer and advance.
+    
+    The LLM calls this after receiving the user's answer to the current profile
+    question. The handler saves the value into user_profile and either asks the
+    next question (staying in the profile node) or marks the profile complete and
+    transitions to questions.
+ 
+    Saving happens inside the handler, so even if the user interrupts mid-flow
+    (triggering go_back or record_topic_interest), whatever answers were already
+    saved via this function are preserved in course_data["user_profile"].
+    """
+ 
+    async def handle_save_profile_answer(
+        args: FlowArgs, flow_manager: FlowManager
+    ) -> tuple[str | None, NodeConfig]:
+        field = args.get("field")
+        value = args.get("value")
+        profile = course_data["user_profile"]
+        profile_config = CONVERSATION_CONFIG["profile_node"]
+ 
+        # --- Persist the answer ---
+        if field and value is not None:
+            if field in ("allergies", "dislikes", "medical_conditions"):
+                # Coerce to list so downstream code is consistent
+                if isinstance(value, list):
+                    profile[field] = value
+                elif isinstance(value, str) and value.lower() not in ("none", "no", "n/a", ""):
+                    profile[field] = [v.strip() for v in value.split(",") if v.strip()]
+                else:
+                    profile[field] = []
+            else:
+                profile[field] = value if str(value).lower() not in ("none", "no", "n/a", "") else None
+ 
+            logger.info(f"Profile: saved {field} = {profile[field]}")
+ 
+        # --- Advance the question pointer ---
+        questions = profile_config["questions"]
+        current_q = profile.get("current_question", 0)
+        next_q = current_q + 1
+        profile["current_question"] = next_q
+ 
+        # --- Check if all questions are answered ---
+        if next_q >= len(questions):
+            profile["profile_complete"] = True
+            logger.info(f"Profile complete: {profile}")
+ 
+            # Notify frontend of completion
+            if hasattr(flow_manager, "_task") and flow_manager._task:
+                frame = RTVIServerMessageFrame(
+                    data={
+                        "type": "profile_complete",
+                        "profile": {k: v for k, v in profile.items() if k not in ("current_question",)},
+                    }
+                )
+                await flow_manager._task.queue_frame(frame)
+ 
+            course_data["current_node"] = "questions"
+            rag = course_data.get("rag_processor")
+            return None, create_questions_node(rag, post_profile=True)
+ 
+        # --- Stay in profile node, ask next question ---
+        next_question_text = questions[next_q]["question"]
+        next_field = questions[next_q]["field"]
+        course_data["current_node"] = "profile"
+ 
+        return None, create_profile_node(
+            question_override=next_question_text,
+            current_field=next_field,
+        )
+ 
+    return FlowsFunctionSchema(
+        name="save_profile_answer",
+        description="""Call this IMMEDIATELY after the user answers the current profile question.
+        
+        - field: the profile field being answered (matches current question)
+        - value: the user's answer as a string. Use "none" if the user has no preference / no allergy / etc.
+        
+        Do NOT wait for confirmation. Save the answer and move on.""",
+        required=["field", "value"],
+        handler=handle_save_profile_answer,
+        properties={
+            "field": {
+                "type": "string",
+                "description": "Profile field name, e.g. 'allergies', 'diet', 'goal', 'dislikes'",
+            },
+            "value": {
+                "type": "string",
+                "description": "The user's answer. Use 'none' when there is nothing to record.",
+            },
+        },
+    )
 
 def create_initial_node() -> NodeConfig:
     """Create the initial node - welcome, then go to Q&A."""
@@ -580,20 +730,62 @@ def create_initial_node() -> NodeConfig:
 async def process_topic_interest(
     args: FlowArgs, flow_manager: FlowManager
 ) -> tuple[str | None, NodeConfig]:
-    """Mark topic as discussed and go to Q&A mode."""
+    """Mark topic as discussed and route to the correct node.
+    
+    'Personal Profile' routes to the profile builder.
+    All other topics route to the standard Q&A node.
+ 
+    Because this handler is also available inside the profile node, selecting a
+    different topic mid-profile will correctly save whatever has already been
+    collected (the save_profile_answer function already persisted each answered
+    field) and then switch context without losing that data.
+    """
     topic = args["topics"][0]
-
+ 
     course_data["responses"][topic] = {"interested": True}
     if topic not in course_data["discussed_topics"]:
         course_data["discussed_topics"].append(topic)
-
+ 
     course_data["current_topics"] = [topic]
-    course_data["current_node"] = "questions"
-
+ 
     remaining = [
         m for m in course_data["all_topics"] if m not in course_data["discussed_topics"]
     ]
-
+ 
+    # --- Route: Personal Profile vs normal Q&A ---
+    if topic == "Personal Profile":
+        course_data["current_node"] = "profile"
+        # Reset question pointer so the profile always starts from the first question
+        course_data["user_profile"]["current_question"] = 0
+ 
+        if hasattr(flow_manager, "_task") and flow_manager._task:
+            frame = RTVIServerMessageFrame(
+                data={
+                    "type": "conversation_state_update",
+                    "all_topics": course_data["all_topics"],
+                    "discussed_topics": course_data["discussed_topics"],
+                    "responses": course_data["responses"],
+                    "remaining_topics": remaining,
+                    "current_topics": [topic],
+                    "current_node": "profile",
+                    "progress": f"{len(course_data['discussed_topics'])}/{len(course_data['all_topics'])}",
+                    "profile_complete": course_data["user_profile"].get("profile_complete", False),
+                }
+            )
+            await flow_manager._task.queue_frame(frame)
+            logger.info("Profile: starting profile builder flow")
+ 
+        profile_config = CONVERSATION_CONFIG["profile_node"]
+        first_question = profile_config["questions"][0]["question"]
+        first_field = profile_config["questions"][0]["field"]
+        return None, create_profile_node(
+            question_override=first_question,
+            current_field=first_field,
+        )
+ 
+    # --- Normal Q&A route ---
+    course_data["current_node"] = "questions"
+ 
     if hasattr(flow_manager, "_task") and flow_manager._task:
         frame = RTVIServerMessageFrame(
             data={
@@ -605,26 +797,106 @@ async def process_topic_interest(
                 "current_topics": [topic],
                 "current_node": "questions",
                 "progress": f"{len(course_data['discussed_topics'])}/{len(course_data['all_topics'])}",
+                "profile_complete": course_data["user_profile"].get("profile_complete", False),
             }
         )
         await flow_manager._task.queue_frame(frame)
         logger.info(f"Course: Marked {topic} as discussed, going to Q&A")
-
+ 
     rag = course_data.get("rag_processor")
-
     return None, create_questions_node(rag)
 
+def create_profile_node(
+    question_override: str = None,
+    current_field: str = None,
+) -> NodeConfig:
+    """Create the profile-builder node.
+ 
+    The node asks exactly ONE question per instantiation. After the user answers,
+    the LLM calls save_profile_answer which transitions to the next question (by
+    creating a new profile node) or to Q&A once all questions are done.
+ 
+    The node also exposes record_topic_interest and go_back so the user can escape
+    mid-profile without getting stuck. Any already-saved answers are preserved.
+ 
+    Args:
+        question_override: The specific question text to ask this turn.
+        current_field: The profile field this question is collecting.
+    """
+    profile_config = CONVERSATION_CONFIG["profile_node"]
+ 
+    # Build the task message for this specific question
+    if question_override:
+        task_content = (
+            f"Ask the user exactly this question and wait for their answer:\n"
+            f'"{question_override}"\n\n'
+            f"The answer should be saved to the field: '{current_field}'.\n"
+            f"Once they answer, immediately call save_profile_answer with "
+            f"field='{current_field}' and the user's answer as value."
+        )
+    else:
+        task_content = profile_config["task_prompt"]
+ 
+    return {
+        "name": "profile",
+        "role_messages": [
+            {
+                "role": "system",
+                "content": profile_config["role_prompt"],
+            }
+        ],
+        "task_messages": [
+            {
+                "role": "system",
+                "content": task_content,
+            }
+        ],
+        # save_profile_answer advances the flow; go_back and record_topic_interest
+        # allow escape without losing already-collected data.
+        "functions": [
+            create_save_profile_answer_function(),
+            create_go_back_function(),
+            create_dynamic_topic_function(),
+            create_exit_function(),
+        ],
+        "respond_immediately": True,
+    }
 
-def create_questions_node(rag_processor: NutritionRAGProcessor = None) -> NodeConfig:
-    """Q&A node where users can ask detailed questions."""
+def create_questions_node(
+    rag_processor: NutritionRAGProcessor = None,
+    post_profile: bool = False,
+) -> NodeConfig:
+    """Q&A node where users can ask detailed questions.
+    
+    Args:
+        rag_processor: RAG processor to pull the latest retrieved food context from.
+        post_profile: When True, the node's task message includes a brief
+            acknowledgement that the profile was just completed.
+    """
     config = CONVERSATION_CONFIG["questions_node"]
 
+    # Inject RAG context
     retrieved = ""
     if rag_processor and rag_processor.last_retrieved_context:
         retrieved = f"\n\n### RETRIEVED FOOD DATA:\n{rag_processor.last_retrieved_context}"
 
-    full_prompt = f"{config['role_prompt']}\n\nFULL COURSE DETAILS:\n\n{config['course_details']}{retrieved}"
+    # Inject user profile context (empty string when no profile data yet)
+    profile_context = build_profile_context_string()
+    profile_section = f"\n\n{profile_context}" if profile_context else ""
 
+    full_prompt = (
+        f"{config['role_prompt']}"
+        f"{profile_section}"
+        f"\n\nFULL COURSE DETAILS:\n\n{config['course_details']}"
+        f"{retrieved}"
+    )
+
+    # Task message — slightly different when arriving right after profile completion
+    if post_profile:
+        profile_config = CONVERSATION_CONFIG["profile_node"]
+        task_content = profile_config["complete_prompt"]
+    else:
+        task_content = config["task_prompt"]
 
     return {
         "name": "questions",
@@ -637,13 +909,14 @@ def create_questions_node(rag_processor: NutritionRAGProcessor = None) -> NodeCo
         "task_messages": [
             {
                 "role": "system",
-                "content": config["task_prompt"],
+                "content": task_content,
             }
         ],
         "functions": [
             create_go_back_function(),
             create_exit_function(),
-            create_dynamic_topic_function()],
+            create_dynamic_topic_function(),
+        ],
         "respond_immediately": True,
     }
 
@@ -734,6 +1007,17 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
         course_data["responses"] = {}
         course_data["current_topics"] = []
         course_data["current_node"] = "initial"
+        # Reset profile for new session
+        course_data["user_profile"] = {
+            "allergies": [],
+            "diet": None,
+            "goal": None,
+            "dislikes": [],
+            "medical_conditions": [],
+            "calorie_target": None,
+            "profile_complete": False,
+            "current_question": 0,
+        }
         await flow_manager.initialize(create_initial_node())
 
     @transport.event_handler("on_client_disconnected")

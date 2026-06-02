@@ -19,6 +19,7 @@ TOPICS = [
     "Diet Recommendations",
     "Nutrient Calculation",
     "Recipe Generation",
+    "Personal Profile"
 ]
 
 # ============= Initial Node (Welcome / Topic Selection) =============
@@ -29,7 +30,7 @@ INITIAL_ROLE_PROMPT = "You are an expert nutritionist. AUDIO output - be warm, p
 # What the bot should say when conversation starts
 INITIAL_TASK_PROMPT = dedent("""
     Say: "Hello! I'm your AI Nutrition Expert. I can help you with diet recommendations or specific food nutrition data. 
-    Would you like to start with some diet recommendations, like the Mediterranean diet?"
+    Would you like to start with some diet recommendations, like the Mediterranean diet? You can also tell me about your dietary preferences and restrictions, and I can give you personalized advice."
 
     Then WAIT for their answer. When they ask about something, call record_topic_interest with that topic, then answer in the next node.
 """).strip()
@@ -109,11 +110,42 @@ QUESTIONS_COURSE_DETAILS = dedent("""
 
 # Short task instruction for Q&A mode
 QUESTIONS_TASK_PROMPT = "Use the provided food data to answer. You are allowed to perform simple multiplication if the user asks for amounts other than 100g."
+
+# ============= Personal Profile Flow =============
+
+PROFILE_ROLE_PROMPT = dedent("""
+You are collecting nutrition profile information from the user.
+
+RULES:
+- Ask ONLY ONE question at a time.
+- Be conversational and natural.
+- Do not answer nutrition questions while profile collection is active.
+- If the user answers something unrelated, politely remind them you are currently collecting their profile information and repeat the current question.
+- When all profile questions are completed, thank the user and tell them their profile will be used for personalized recommendations during this session.
+""").strip()
+
+PROFILE_TASK_PROMPT = """
+Start by asking the first profile question.
+"""
+
+PROFILE_COMPLETE_PROMPT = """
+The user's nutrition profile is complete.
+
+Briefly summarize:
+- allergies
+- diet
+- goal
+- dislikes
+
+Then tell them you will use this information for future recommendations during this session.
+"""
+
 # Optional: Topic-specific descriptions for frontend display
 TOPIC_INFO = {
     "Diet Recommendations": "Personalized advice based on different diet principles.",
     "Nutrient Calculation": "Calculated nutrients based on food component data.",
-    "Recipe Generation": "Recommendations for recipes according to user needs."
+    "Recipe Generation": "Recommendations for recipes according to user needs.",
+    "Personal Profile": "User's dietary preferences and restrictions."
 }
 
 # ============= Topic Keywords (for function descriptions) =============
@@ -122,8 +154,28 @@ TOPIC_INFO = {
 TOPIC_KEYWORDS = {
     "Diet Recommendations": ["diet", "recommendations", "healthy", "eating", "meal"],
     "Nutrient Calculation": ["calculate", "how much", "how many", "sum"],
-    "Recipe Generation": ["create", "ingredients", "shopping list", "meal", "lunch", "breakfast", "dinner", "snack"]
+    "Recipe Generation": ["create", "ingredients", "shopping list", "meal", "lunch", "breakfast", "dinner", "snack"],
+    "Personal Profile": ["about me", "profile", "prefrences", "allergies", "tell you about myself", "my info", "my data"]
 }
+
+PROFILE_QUESTIONS = [
+    {
+        "field": "allergies",
+        "question": "Do you have any food allergies?"
+    },
+    {
+        "field": "diet",
+        "question": "Do you follow a specific diet such as vegetarian, vegan, keto, or Mediterranean?"
+    },
+    {
+        "field": "goal",
+        "question": "What is your primary nutrition goal? Weight loss, muscle gain, maintenance, or something else?"
+    },
+    {
+        "field": "dislikes",
+        "question": "Are there foods you dislike or prefer to avoid?"
+    }
+]
 
 # ============= Function Prompts (Advanced - careful when editing) =============
 # These control tool/function behavior. Modify only if you understand the flow logic.
@@ -174,6 +226,13 @@ CONVERSATION_CONFIG = {
         "course_details": QUESTIONS_COURSE_DETAILS,
         "task_prompt": QUESTIONS_TASK_PROMPT,
         "topic_info": TOPIC_INFO,
+    },
+
+    "profile_node": {
+        "role_prompt": PROFILE_ROLE_PROMPT,
+        "task_prompt": PROFILE_TASK_PROMPT,
+        "questions": PROFILE_QUESTIONS,
+        "complete_prompt": PROFILE_COMPLETE_PROMPT,
     },
 
     "functions": {
