@@ -74,6 +74,36 @@ Open `http://localhost:5173` in your browser.
 > [!TIP]
 > **No provider access?** Free options: Azure Speech (5 hrs/month free), Deepgram ($200 credit), OpenAI Whisper ($0.006/min).
 
+## Recipes Vector database structure
+```json
+{
+  "id": "recipe_000001",
+
+  "document": "Recipe: ... natural language summary ...",
+
+  "metadata": {
+    "recipe_name": "Classic Cabbage Slaw with Grandmother Shinn's Dressing",
+    "calories": 511.28,
+    "diet_labels": ["Balanced"],
+    "cautions": ["Gluten-Free", "Peanut-Free"],
+    "ingredient_lines": [
+      "1 tablespoon kosher salt",
+      "2 cups water",
+      "4 cups shredded green cabbage"
+    ],
+    "total_nutrients": {
+      "ENERC_KCAL": 511.28,
+      "PROCNT": 19.59,
+      "FAT": 15.26,
+      "CHOCDF": 74.52,
+      "FIBTG": 12.63,
+      "SUGAR": 55.65,
+      "NA": 2866.73
+    }
+  }
+}
+```
+
 ## Adapt for your conversational task
 
 | I want to...                          | File                                         | Look for                        |

@@ -19,4 +19,5 @@ frontend/tsconfig.tsbuildinfo
 # Chroma
 backend/chroma_db/
 backend/data/
+backend/recipe_chroma_db/
 
