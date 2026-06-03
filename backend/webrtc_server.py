@@ -408,7 +408,7 @@ def build_profile_context_string() -> str:
     if not parts:
         return ""
  
-    header = "### USER PROFILE (use this to personalise every recommendation):\n"
+    header = "### USER PROFILE (use this to personalise every recommendation, if the user asks for a different prefrence in the main question, ignore the prefrence from their profile):\n"
     return header + "\n".join(parts) + "\n"
 
 class ConversationStateProcessor(FrameProcessor):
@@ -420,7 +420,7 @@ class ConversationStateProcessor(FrameProcessor):
 
     When a flow transition happens (e.g., user selects a topic), this processor
     pushes an RTVIServerMessageFrame that the frontend receives as an
-    onServerMessage callback, triggering UI updates (topic cards ⭕ → ✅).
+    onServerMessage callback, triggering UI updates (topic cards).
     """
 
     def __init__(self, course_data: dict):
