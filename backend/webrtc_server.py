@@ -79,6 +79,16 @@ WORD_TO_NUM = {
     "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "twenty": 20
 }
 
+# Keywords that signal a recipe-type query regardless of current_topics state.
+# Used by NutritionRAGProcessor to pick the right database BEFORE topic routing
+# has updated current_topics (which happens later, inside process_topic_interest).
+RECIPE_INTENT_KEYWORDS = (
+    "recipe", "recipes", "meal plan", "meal ideas",
+    "cook", "cooking", "dish", "dishes",
+    "breakfast", "lunch", "dinner", "snack",
+    "shopping list", "ingredients for",
+)
+
 def extract_requested_count(text: str, default: int = 10) -> int:
     text_lower = text.lower()
 
@@ -122,7 +132,7 @@ class StructuredDataProcessor(FrameProcessor):
 
         if isinstance(frame, LLMFullResponseEndFrame):
             self._capturing = False
-            logger.info(f"StructuredData RAW BUFFER: {repr(self._buffer)}")  # add this
+            logger.info(f"StructuredData RAW BUFFER: {repr(self._buffer)}")
 
             # Parse out the JSON block if present
             if "---JSON---" in self._buffer:
@@ -230,6 +240,7 @@ class NutritionRAGProcessor(FrameProcessor):
     def __init__(self, context: LLMContext):
         super().__init__()
         self._context = context
+        self.last_retrieval_type = "nutrition"
         self.last_retrieved_context = "No nutrition data retrieved yet."
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
@@ -237,12 +248,40 @@ class NutritionRAGProcessor(FrameProcessor):
 
         if isinstance(frame, TranscriptionFrame):
             user_text = frame.text
-            #logger.info(f"RAG: Querying database for: {user_text}")
-            n = extract_requested_count(user_text)
-            retrieved_context = query_nutrition_data(query_text=user_text, n_results=n)
+            text_lower = user_text.lower()
+
+            # Detect recipe intent from the user's actual words rather than
+            # current_topics, because current_topics is updated AFTER this
+            # frame is processed (inside process_topic_interest). On the first
+            # query for a new topic, current_topics still reflects the previous
+            # topic, so checking it here would route to the wrong database.
+            #
+            # Two-part check:
+            #   1. keyword match on the current utterance  (catches first query)
+            #   2. already in Recipe Generation topic      (catches follow-up questions)
+            is_recipe_request = (
+                any(kw in text_lower for kw in RECIPE_INTENT_KEYWORDS)
+                or course_data.get("current_topics") == ["Recipe Generation"]
+            )
+
+            if is_recipe_request:
+                self.last_retrieval_type = "recipe"
+                retrieved_context = query_recipe_data(
+                    query_text=user_text,
+                    n_results=15,
+                )
+                logger.info(f"RAG: recipe query, retrieved {len(retrieved_context)} chars")
+            else:
+                self.last_retrieval_type = "nutrition"
+                n = extract_requested_count(user_text)
+                retrieved_context = query_nutrition_data(
+                    query_text=user_text,
+                    n_results=n,
+                )
+                logger.info(f"RAG: nutrition query (n={n}), retrieved {len(retrieved_context)} chars")
+
             self.last_retrieved_context = retrieved_context
-            #logger.info(f"RAG: Retrieved {len(retrieved_context)} chars")
-            
+
         await self.push_frame(frame, direction)
 
 # ============= STT/TTS Service Factories =============
@@ -363,7 +402,7 @@ course_data = {
     "user_profile": user_profile
 }
 
-# ============= Custom Frame Processors =============
+# ============= Profile Helper =============
 
 def build_profile_context_string() -> str:
     """Build a human-readable profile summary to inject into LLM system prompts.
@@ -372,63 +411,53 @@ def build_profile_context_string() -> str:
     so nodes are not polluted with empty/useless context.
     """
     profile = course_data["user_profile"]
- 
+
     parts = []
- 
+
     if profile.get("allergies"):
         allergies = profile["allergies"]
         if isinstance(allergies, list):
             parts.append(f"- Allergies: {', '.join(allergies)}")
         else:
             parts.append(f"- Allergies: {allergies}")
- 
+
     if profile.get("diet"):
         parts.append(f"- Diet: {profile['diet']}")
- 
+
     if profile.get("goal"):
         parts.append(f"- Nutrition goal: {profile['goal']}")
- 
+
     if profile.get("dislikes"):
         dislikes = profile["dislikes"]
         if isinstance(dislikes, list):
             parts.append(f"- Dislikes / foods to avoid: {', '.join(dislikes)}")
         else:
             parts.append(f"- Dislikes / foods to avoid: {dislikes}")
- 
+
     if profile.get("medical_conditions"):
         conditions = profile["medical_conditions"]
         if isinstance(conditions, list) and conditions:
             parts.append(f"- Medical conditions: {', '.join(conditions)}")
         elif isinstance(conditions, str) and conditions:
             parts.append(f"- Medical conditions: {conditions}")
- 
+
     if profile.get("calorie_target"):
         parts.append(f"- Daily calorie target: {profile['calorie_target']} kcal")
- 
+
     if not parts:
         return ""
- 
-    header = "### USER PROFILE (use this to personalise every recommendation, if the user asks for a different prefrence in the main question, ignore the prefrence from their profile):\n"
+
+    header = "### USER PROFILE (use this to personalise every recommendation, if the user asks for a different preference in the main question, ignore the preference from their profile):\n"
     return header + "\n".join(parts) + "\n"
 
+
+# ============= Custom Frame Processors =============
+
+
 class ConversationStateProcessor(FrameProcessor):
-    """Sends conversation state updates to the frontend via RTVI messages.
-
-    This processor keeps the React UI in sync with backend conversation state.
-    It sends updates about what topics have been discussed, what's remaining,
-    current progress, and which flow node the conversation is in.
-
-    When a flow transition happens (e.g., user selects a topic), this processor
-    pushes an RTVIServerMessageFrame that the frontend receives as an
-    onServerMessage callback, triggering UI updates (topic cards).
-    """
+    """Sends conversation state updates to the frontend via RTVI messages."""
 
     def __init__(self, course_data: dict):
-        """Initialize the course state processor.
-
-        Args:
-            course_data: Dictionary containing course state (topics, responses, etc.).
-        """
         super().__init__()
         self.course_data = course_data
         self.last_sent_state: Dict[str, Any] = {}
@@ -442,29 +471,15 @@ class ConversationStateProcessor(FrameProcessor):
         ]
 
         current_state = {
-            # Message type identifier (used by frontend to route different message types)
             "type": "conversation_state_update",
-
-            # All available topics (static list)
             "all_topics": self.course_data["all_topics"],
-
-            # Topics user has already asked about
             "discussed_topics": self.course_data["discussed_topics"],
-
-            # Topics not yet discussed
             "remaining_topics": remaining,
-
-            # Topics currently being discussed (array, usually 1 item)
             "current_topics": self.course_data.get("current_topics", []),
-
-            # User interaction metadata per topic (e.g., {topic_name: {interested: true}})
             "responses": self.course_data["responses"],
-
-            # Current position in the conversation flow (e.g., "initial", "questions")
             "current_node": self.course_data.get("current_node", "initial"),
-
-            # Progress indicator for UI (e.g., "2/3")
             "progress": f"{len(self.course_data['discussed_topics'])}/{len(self.course_data['all_topics'])}",
+            "profile_complete": self.course_data["user_profile"].get("profile_complete", False),
         }
 
         state_changed = current_state != self.last_sent_state or current_state.get(
@@ -476,21 +491,8 @@ class ConversationStateProcessor(FrameProcessor):
             self.last_sent_state = current_state.copy()
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
-        """Process pipeline frames and send state updates to frontend.
-
-        Monitors LLM responses and function call results, triggering course
-        state updates to the React UI when flow transitions occur.
-
-        Args:
-            frame: The pipeline frame to process.
-            direction: Frame direction (upstream/downstream).
-        """
         await super().process_frame(frame, direction)
 
-        #if isinstance(frame, RTVIServerMessageFrame):
-            #logger.info(f"RTVI MESSAGE SENT TO FRONTEND: {frame.data}")
-
-        # Send state update after LLM responses and function calls
         if isinstance(frame, (LLMFullResponseEndFrame, FunctionCallResultFrame)):
             await self.send_state_update()
 
@@ -506,7 +508,6 @@ def create_go_back_function() -> FlowsFunctionSchema:
     async def handle_go_back(
         args: FlowArgs, flow_manager: FlowManager
     ) -> tuple[str | None, NodeConfig]:
-        """Handle user wanting to go back to topic selection."""
         course_data["current_node"] = "initial"
 
         if hasattr(flow_manager, "_task") and flow_manager._task:
@@ -524,6 +525,7 @@ def create_go_back_function() -> FlowsFunctionSchema:
                     "current_topics": [],
                     "current_node": "initial",
                     "progress": f"{len(course_data['discussed_topics'])}/{len(course_data['all_topics'])}",
+                    "profile_complete": course_data["user_profile"].get("profile_complete", False),
                 }
             )
             await flow_manager._task.queue_frame(frame)
@@ -547,7 +549,6 @@ def create_exit_function() -> FlowsFunctionSchema:
     async def handle_exit_conversation(
         args: FlowArgs, flow_manager: FlowManager
     ) -> tuple[str | None, NodeConfig]:
-        """Handle user wanting to exit the conversation."""
         count_discussed = len(course_data.get("discussed_topics", []))
         logger.info(
             f"User exiting conversation after discussing {count_discussed} course topics"
@@ -584,16 +585,11 @@ def create_exit_function() -> FlowsFunctionSchema:
 
 def create_dynamic_topic_function() -> FlowsFunctionSchema:
     """Generate function with dynamic enum based on remaining topics."""
-    # REMOVED because we allow the user to ask questions on the same topic
-    # remaining = [t for t in course_data["all_topics"] if t not in course_data["discussed_topics"]]
-
-    # QUICK FIX:
     remaining = course_data["all_topics"]
 
     if not remaining:
         return None
 
-    # Get description from config (dynamically generated with current topics)
     description_generator = CONVERSATION_CONFIG["functions"]["topic_function_description"]
     description = description_generator(remaining)
 
@@ -611,19 +607,10 @@ def create_dynamic_topic_function() -> FlowsFunctionSchema:
         },
     )
 
+
 def create_save_profile_answer_function() -> FlowsFunctionSchema:
-    """Create a function for the profile node to save a single answer and advance.
-    
-    The LLM calls this after receiving the user's answer to the current profile
-    question. The handler saves the value into user_profile and either asks the
-    next question (staying in the profile node) or marks the profile complete and
-    transitions to questions.
- 
-    Saving happens inside the handler, so even if the user interrupts mid-flow
-    (triggering go_back or record_topic_interest), whatever answers were already
-    saved via this function are preserved in course_data["user_profile"].
-    """
- 
+    """Create a function for the profile node to save a single answer and advance."""
+
     async def handle_save_profile_answer(
         args: FlowArgs, flow_manager: FlowManager
     ) -> tuple[str | None, NodeConfig]:
@@ -631,11 +618,10 @@ def create_save_profile_answer_function() -> FlowsFunctionSchema:
         value = args.get("value")
         profile = course_data["user_profile"]
         profile_config = CONVERSATION_CONFIG["profile_node"]
- 
+
         # --- Persist the answer ---
         if field and value is not None:
             if field in ("allergies", "dislikes", "medical_conditions"):
-                # Coerce to list so downstream code is consistent
                 if isinstance(value, list):
                     profile[field] = value
                 elif isinstance(value, str) and value.lower() not in ("none", "no", "n/a", ""):
@@ -644,21 +630,20 @@ def create_save_profile_answer_function() -> FlowsFunctionSchema:
                     profile[field] = []
             else:
                 profile[field] = value if str(value).lower() not in ("none", "no", "n/a", "") else None
- 
+
             logger.info(f"Profile: saved {field} = {profile[field]}")
- 
+
         # --- Advance the question pointer ---
         questions = profile_config["questions"]
         current_q = profile.get("current_question", 0)
         next_q = current_q + 1
         profile["current_question"] = next_q
- 
+
         # --- Check if all questions are answered ---
         if next_q >= len(questions):
             profile["profile_complete"] = True
             logger.info(f"Profile complete: {profile}")
- 
-            # Notify frontend of completion
+
             if hasattr(flow_manager, "_task") and flow_manager._task:
                 frame = RTVIServerMessageFrame(
                     data={
@@ -667,21 +652,21 @@ def create_save_profile_answer_function() -> FlowsFunctionSchema:
                     }
                 )
                 await flow_manager._task.queue_frame(frame)
- 
+
             course_data["current_node"] = "questions"
             rag = course_data.get("rag_processor")
             return None, create_questions_node(rag, post_profile=True)
- 
+
         # --- Stay in profile node, ask next question ---
         next_question_text = questions[next_q]["question"]
         next_field = questions[next_q]["field"]
         course_data["current_node"] = "profile"
- 
+
         return None, create_profile_node(
             question_override=next_question_text,
             current_field=next_field,
         )
- 
+
     return FlowsFunctionSchema(
         name="save_profile_answer",
         description="""Call this IMMEDIATELY after the user answers the current profile question.
@@ -703,6 +688,7 @@ def create_save_profile_answer_function() -> FlowsFunctionSchema:
             },
         },
     )
+
 
 def create_initial_node() -> NodeConfig:
     """Create the initial node - welcome, then go to Q&A."""
@@ -730,34 +716,24 @@ def create_initial_node() -> NodeConfig:
 async def process_topic_interest(
     args: FlowArgs, flow_manager: FlowManager
 ) -> tuple[str | None, NodeConfig]:
-    """Mark topic as discussed and route to the correct node.
-    
-    'Personal Profile' routes to the profile builder.
-    All other topics route to the standard Q&A node.
- 
-    Because this handler is also available inside the profile node, selecting a
-    different topic mid-profile will correctly save whatever has already been
-    collected (the save_profile_answer function already persisted each answered
-    field) and then switch context without losing that data.
-    """
+    """Mark topic as discussed and route to the correct node."""
     topic = args["topics"][0]
- 
+
     course_data["responses"][topic] = {"interested": True}
     if topic not in course_data["discussed_topics"]:
         course_data["discussed_topics"].append(topic)
- 
+
     course_data["current_topics"] = [topic]
- 
+
     remaining = [
         m for m in course_data["all_topics"] if m not in course_data["discussed_topics"]
     ]
- 
+
     # --- Route: Personal Profile vs normal Q&A ---
     if topic == "Personal Profile":
         course_data["current_node"] = "profile"
-        # Reset question pointer so the profile always starts from the first question
         course_data["user_profile"]["current_question"] = 0
- 
+
         if hasattr(flow_manager, "_task") and flow_manager._task:
             frame = RTVIServerMessageFrame(
                 data={
@@ -774,7 +750,7 @@ async def process_topic_interest(
             )
             await flow_manager._task.queue_frame(frame)
             logger.info("Profile: starting profile builder flow")
- 
+
         profile_config = CONVERSATION_CONFIG["profile_node"]
         first_question = profile_config["questions"][0]["question"]
         first_field = profile_config["questions"][0]["field"]
@@ -782,10 +758,10 @@ async def process_topic_interest(
             question_override=first_question,
             current_field=first_field,
         )
- 
+
     # --- Normal Q&A route ---
     course_data["current_node"] = "questions"
- 
+
     if hasattr(flow_manager, "_task") and flow_manager._task:
         frame = RTVIServerMessageFrame(
             data={
@@ -802,30 +778,18 @@ async def process_topic_interest(
         )
         await flow_manager._task.queue_frame(frame)
         logger.info(f"Course: Marked {topic} as discussed, going to Q&A")
- 
+
     rag = course_data.get("rag_processor")
     return None, create_questions_node(rag)
+
 
 def create_profile_node(
     question_override: str = None,
     current_field: str = None,
 ) -> NodeConfig:
-    """Create the profile-builder node.
- 
-    The node asks exactly ONE question per instantiation. After the user answers,
-    the LLM calls save_profile_answer which transitions to the next question (by
-    creating a new profile node) or to Q&A once all questions are done.
- 
-    The node also exposes record_topic_interest and go_back so the user can escape
-    mid-profile without getting stuck. Any already-saved answers are preserved.
- 
-    Args:
-        question_override: The specific question text to ask this turn.
-        current_field: The profile field this question is collecting.
-    """
+    """Create the profile-builder node."""
     profile_config = CONVERSATION_CONFIG["profile_node"]
- 
-    # Build the task message for this specific question
+
     if question_override:
         task_content = (
             f"Ask the user exactly this question and wait for their answer:\n"
@@ -836,7 +800,7 @@ def create_profile_node(
         )
     else:
         task_content = profile_config["task_prompt"]
- 
+
     return {
         "name": "profile",
         "role_messages": [
@@ -851,8 +815,6 @@ def create_profile_node(
                 "content": task_content,
             }
         ],
-        # save_profile_answer advances the flow; go_back and record_topic_interest
-        # allow escape without losing already-collected data.
         "functions": [
             create_save_profile_answer_function(),
             create_go_back_function(),
@@ -862,36 +824,40 @@ def create_profile_node(
         "respond_immediately": True,
     }
 
+
 def create_questions_node(
     rag_processor: NutritionRAGProcessor = None,
     post_profile: bool = False,
 ) -> NodeConfig:
-    """Q&A node where users can ask detailed questions.
-    
-    Args:
-        rag_processor: RAG processor to pull the latest retrieved food context from.
-        post_profile: When True, the node's task message includes a brief
-            acknowledgement that the profile was just completed.
-    """
+    """Q&A node where users can ask detailed questions."""
     config = CONVERSATION_CONFIG["questions_node"]
 
-    # Inject RAG context
+    retrieval_type = "nutrition"
     retrieved = ""
-    if rag_processor and rag_processor.last_retrieved_context:
-        retrieved = f"\n\n### RETRIEVED FOOD DATA:\n{rag_processor.last_retrieved_context}"
 
-    # Inject user profile context (empty string when no profile data yet)
+    if rag_processor:
+        retrieval_type = rag_processor.last_retrieval_type
+        retrieved = rag_processor.last_retrieved_context
+
+    # Inject user profile context
     profile_context = build_profile_context_string()
     profile_section = f"\n\n{profile_context}" if profile_context else ""
+
+    if retrieval_type == "recipe":
+        knowledge_base = config["recipe_details"]
+        retrieved_section = f"\n\n### RETRIEVED RECIPES:\n{retrieved}"
+    else:
+        knowledge_base = config["course_details"]
+        retrieved_section = f"\n\n### RETRIEVED FOOD DATA:\n{retrieved}"
 
     full_prompt = (
         f"{config['role_prompt']}"
         f"{profile_section}"
-        f"\n\nFULL COURSE DETAILS:\n\n{config['course_details']}"
-        f"{retrieved}"
+        f"\n\nKNOWLEDGE BASE:\n\n"
+        f"{knowledge_base}"
+        f"{retrieved_section}"
     )
 
-    # Task message — slightly different when arriving right after profile completion
     if post_profile:
         profile_config = CONVERSATION_CONFIG["profile_node"]
         task_content = profile_config["complete_prompt"]
@@ -937,17 +903,13 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
         ),
     )
 
-    # STT/TTS Services (configurable via .env)
     stt = create_stt_service()
     tts = create_tts_service()
-
-    # LLM (configurable via LLM_PROVIDER env var, default: openai)
     llm = create_llm_service()
 
     context = LLMContext()
     context_aggregator = LLMContextAggregatorPair(context)
 
-    # Polite mode: mute STT while bot is speaking (prevents echo/feedback)
     stt_mute_filter = STTMuteFilter(
         config=STTMuteConfig(
             strategies={STTMuteStrategy.ALWAYS, STTMuteStrategy.FUNCTION_CALL}
@@ -955,20 +917,13 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
     )
 
     rag_processor = NutritionRAGProcessor(context)
-
     course_data["rag_processor"] = rag_processor
 
-    # RTVI processor for frontend communication
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]), transport=transport)
-
-    # Course state processor — sends flow state to frontend
     course_state_processor = ConversationStateProcessor(course_data)
-    # To seperate json from readable text. Used for extracting Nutritional tables and shopping lists
     structured_data_processor = StructuredDataProcessor()
-    
     bot_streaming_processor = BotStreamingTextProcessor()
 
-    # Pipeline: audio in -> STT -> mute filter -> LLM -> state updates -> TTS -> audio out
     pipeline = Pipeline(
         [
             transport.input(),
@@ -1007,7 +962,6 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
         course_data["responses"] = {}
         course_data["current_topics"] = []
         course_data["current_node"] = "initial"
-        # Reset profile for new session
         course_data["user_profile"] = {
             "allergies": [],
             "diet": None,
@@ -1034,6 +988,7 @@ async def run_bot(runner_args: SmallWebRTCRunnerArguments):
     await runner.run(task)
 
 # ============= ChromaDB Utils ==========
+
 def query_nutrition_data(query_text: str, n_results: int = 10):
     try:
         client = chromadb.PersistentClient(path="./chroma_db")
@@ -1046,12 +1001,29 @@ def query_nutrition_data(query_text: str, n_results: int = 10):
             query_texts=[query_text],
             n_results=n_results
         )        
-        # Format the documents into a single block of text for the LLM
         context_block = "\n".join(results['documents'][0])
         return context_block
     except Exception as e:
         logger.error(f"ChromaDB Query Error: {e}")
         return "No specific food data found."
+
+def query_recipe_data(query_text: str, n_results: int = 15):
+    try:
+        client = chromadb.PersistentClient(path="./recipe_chroma_db")
+        collection = client.get_collection(
+            name="recipes",
+            embedding_function=emb_fn
+        )
+        count = collection.count()
+        n_results = min(n_results, count)
+        results = collection.query(
+            query_texts=[query_text],
+            n_results=n_results
+        )
+        return "\n\n".join(results["documents"][0])
+    except Exception as e:
+        logger.error(f"Recipe ChromaDB Query Error: {e}")
+        return "No recipe data found."
 
 
 # ============= FastAPI App =============
@@ -1075,7 +1047,6 @@ async def root():
 
 @app.post("/api/start")
 async def start(request: dict, background_tasks: BackgroundTasks):
-    """Start endpoint — returns the WebRTC offer URL."""
     return {"webrtcUrl": "/api/offer"}
 
 
@@ -1092,7 +1063,6 @@ async def offer(request: dict, background_tasks: BackgroundTasks):
             restart_pc=request.get("restart_pc", False),
         )
     else:
-        # Localhost: no TURN needed, direct connection works
         pipecat_connection = SmallWebRTCConnection()
         await pipecat_connection.initialize(sdp=request["sdp"], type=request["type"])
 
@@ -1112,7 +1082,6 @@ async def offer(request: dict, background_tasks: BackgroundTasks):
 # Serve built frontend static files if they exist (Docker mode)
 if os.path.exists("/app/static/index.html"):
     from fastapi.staticfiles import StaticFiles
-
     app.mount("/", StaticFiles(directory="/app/static", html=True), name="static")
 
 
