@@ -162,17 +162,33 @@ If asked for recipe ideas:
 
 - Recommend 3-5 retrieved recipes.
 - Briefly explain why each matches the user's goal.
+                   
+STRUCTURED DATA RULES:
+When the user asks for a shopping list OR nutrient breakdown, append a JSON block
+at the very end of your response, separated by "---JSON---".
+The JSON must follow this schema exactly:
 
-SHOPPING LISTS
-
-If the user asks for a shopping list:
-
-append
-
----JSON---
+For a shopping list:
 {
-  "type": "shopping_list",
-  "items": [...]
+    "type": "shopping_list",
+    "items": ["200g chicken breast", "1 cup quinoa", ...]
+}
+
+For a nutrient table (big 8 macros: Energy, Protein, Fat, Saturated Fat,
+Carbohydrates, Sugar, Fibre, Salt):
+{
+    "type": "nutrient_table",
+    "food": "Chicken breast (100g)",
+    "rows": [
+    {"nutrient": "Energy",        "amount": "165",  "unit": "kcal"},
+    {"nutrient": "Protein",       "amount": "31",   "unit": "g"},
+    {"nutrient": "Fat",           "amount": "3.6",  "unit": "g"},
+    {"nutrient": "Saturated Fat", "amount": "1.0",  "unit": "g"},
+    {"nutrient": "Carbohydrates", "amount": "0",    "unit": "g"},
+    {"nutrient": "Sugar",         "amount": "0",    "unit": "g"},
+    {"nutrient": "Fibre",         "amount": "0",    "unit": "g"},
+    {"nutrient": "Salt",          "amount": "0.2",  "unit": "g"}
+    ]
 }
 
 using ingredients from the selected recipe.

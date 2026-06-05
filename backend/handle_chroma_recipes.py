@@ -75,25 +75,40 @@ def coerce_list(value) -> list:
     return [str(value)]
 
 
-def extract_macro_nutrients(total_nutrients: dict) -> dict:
+def extract_macro_nutrients(total_nutrients) -> dict:
     """Extract key nutrition values from the nested nutrient structure."""
+    if isinstance(total_nutrients, str):
+        try:
+            total_nutrients = json.loads(total_nutrients)
+        except json.JSONDecodeError:
+            return {}
     if not isinstance(total_nutrients, dict):
+        print(f"total_nutrients is not a dict, it is: {type(total_nutrients)}, value: {repr(total_nutrients)[:200]}")
         return {}
 
     keys = {
         "ENERC_KCAL": "calories",
         "PROCNT":     "protein",
         "FAT":        "fat",
+        "FASAT":      "saturated_fat",
         "CHOCDF":     "carbs",
         "FIBTG":      "fiber",
         "SUGAR":      "sugar",
+        "NA":         "sodium",
     }
 
     result = {}
     for k, label in keys.items():
         val = total_nutrients.get(k)
-        if isinstance(val, dict):
-            result[label] = round(float(val.get("quantity", 0)), 2)
+        print(f"{k}: type={type(val)}, value={repr(val)[:100]}")
+        if val is not None:
+            try:
+                result[label] = round(float(val.get("quantity", 0) if hasattr(val, "get") else val["quantity"]), 2)
+            except (KeyError, TypeError, ValueError) as e:
+                print(f"  -> failed to extract quantity for {k}: {e}")
+
+    if "sodium" in result:
+            result["sodium"] = round(result["sodium"] / 1000, 2)
 
     return result
 
@@ -123,8 +138,9 @@ def recipe_to_document(recipe: dict) -> str:
         parts.append("Ingredients: " + ", ".join(ingredients) + ".")
 
     if nutrients:
-        macro_text = ", ".join(f"{k} {v}g" for k, v in nutrients.items())
-        parts.append("Macronutrients: " + macro_text + ".")
+            macro_sentence_parts = [f"{calories} calories"]
+            macro_sentence_parts += [f"{v}g of {k}" for k, v in nutrients.items() if k != "calories"]
+            parts.append("This recipe contains " + ", ".join(macro_sentence_parts) + ".")
 
     diet_str = ", ".join(diet_labels) if diet_labels else "general diets"
     parts.append(
