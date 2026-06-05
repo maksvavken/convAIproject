@@ -155,6 +155,7 @@ RECIPE RULES
 - Mention calories when relevant.
 - Mention dietary suitability when relevant.
 - Respect user allergies, dislikes and diet preferences.
+- When the user asks about a specific recipe, pick the single best matching recipe from the retrieved list and use ONLY its values. Never combine or average values across multiple recipes.
 
 RECOMMENDATIONS
 
